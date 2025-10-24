@@ -5,9 +5,10 @@ module gaussian_filter #(
 ) (
     input  logic clk,
     input  logic rst_n,
-    input  logic upsample_valid,
+    input  logic upsample_out_valid,
     input  logic signed [IN_WIDTH  - 1 : 0] data_i,
-    output logic signed [OUT_WIDTH - 1 : 0] data_o
+    output logic signed [OUT_WIDTH - 1 : 0] data_o,
+    output logic gaussian_filter_out_valid
 );
 
 integer i;
@@ -23,9 +24,12 @@ always @(posedge clk or negedge rst_n) begin
             store_in[i] <= '0;
         end
         data_o <= 'b0;
+        gaussian_filter_out_valid <= 'b0;
     end 
     else begin
-        if (upsample_valid) begin
+        if (upsample_out_valid) begin
+            gaussian_filter_out_valid <= 'b1;
+
             for (i = N-1 ; i > 0 ; i-- ) begin
                 store_in[i] <= store_in[i-1];
             end
@@ -33,9 +37,9 @@ always @(posedge clk or negedge rst_n) begin
             store_in[0] <= data_i;
 
             acc = 'd0;
-            
+
             for (i = 0; i < N; i++) begin
-                acc <= acc + store_in[i] * h[i];
+                acc <= acc + (store_in[i] * h[i]);
             end
 
             data_o <= acc;
