@@ -36,7 +36,7 @@ always @ (posedge clk or negedge rst_n)
       end 
     else 
       begin
-        if (bit_valid_i) // for taking input
+        if (bit_valid_i) // for taking input if we will send 2 frames consecutive we must leave a clock cycle between them
           begin 
             if (counter != DATA_WIDTH ) 
               begin 
@@ -82,10 +82,11 @@ always @(*)
       begin
         for(i = 0; i <= DATA_WIDTH - 'b1; i = i + 'b1 ) //Loop on the DATA_WIDTH
           begin 
-            for (j = 0; j <= SAMPLE_PER_SYMBOL - 'b1; j = j + 'b1 ) //Loop on the SAMPLE_PER_SYMBOL
-              begin 
-                bit_upsample_reg [i][j] = phy_bit_reg_in [i]; //assign the 2D array with the same bit reptition
-               end
+            case(phy_bit_reg_in [i])
+              0: bit_upsample_reg [i] = {SAMPLE_PER_SYMBOL{1'b1}};
+              1: bit_upsample_reg [i] = {{(SAMPLE_PER_SYMBOL-1){1'b0}}, 1'b1};
+
+            endcase
           end
          done = 'b1; //after the upsample operation assign done to 1 to start passing the output
       end
@@ -99,3 +100,5 @@ assign  flag_done = ((done || count_loop != 'b0) && (count_loop != DATA_WIDTH ))
 assign valid = (counter == DATA_WIDTH )? 'b1: 'b0 ;
 
 endmodule
+
+                
