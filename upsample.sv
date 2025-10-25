@@ -15,7 +15,6 @@ module upsample #
 
 integer counter = 'b0;
 integer i;
-integer j;
 integer count_loop ='b0;
 reg [ DATA_WIDTH - 1 : 0] phy_bit_reg_in;
 reg [ SAMPLE_PER_SYMBOL -1 : 0] bit_upsample_reg [DATA_WIDTH - 1 : 0];
@@ -82,11 +81,9 @@ always @(*)
       begin
         for(i = 0; i <= DATA_WIDTH - 'b1; i = i + 'b1 ) //Loop on the DATA_WIDTH
           begin 
-            case(phy_bit_reg_in [i])
-              0: bit_upsample_reg [i] = {SAMPLE_PER_SYMBOL{1'b1}};
-              1: bit_upsample_reg [i] = {{(SAMPLE_PER_SYMBOL-1){1'b0}}, 1'b1};
-
-            endcase
+           
+              bit_upsample_reg [i] <= {SAMPLE_PER_SYMBOL{phy_bit_reg_in [i]}}; // +ve deviation (1) is 1 and -ve deviation is 0 (-1)
+            
           end
          done = 'b1; //after the upsample operation assign done to 1 to start passing the output
       end
