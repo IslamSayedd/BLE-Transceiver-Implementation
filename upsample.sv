@@ -1,6 +1,6 @@
 module upsample #
 (
-  parameter SAMPLE_PER_SYMBOL = 8,
+  parameter SAMPLE_PER_SYMBOL = 8, //number for repeatition
             DATA_WIDTH = 11 //number of bits from the mux
 ) (
   input wire clk,
@@ -96,8 +96,8 @@ always @(*)
       end
   end
 
-assign  flag_done = ((done || count_loop != 'b0) && (count_loop != DATA_WIDTH ))? 'b1 :'b0 ;
-assign valid = (counter == DATA_WIDTH )? 'b1: 'b0 ;
+assign  flag_done = ((done || count_loop != 'b0) && (count_loop != DATA_WIDTH ))? 'b1 :'b0 ; // to ensure that the flag is 1 first when the done is 1 and then until i send all the data
+assign valid = (counter == DATA_WIDTH )? 'b1: 'b0 ; // I already received the full frame
 
 endmodule
 
