@@ -1,50 +1,82 @@
 module gaussian_filter #(
-    parameter IN_WIDTH = 8 , 
-    parameter OUT_WIDTH = IN_WIDTH + IN_WIDTH ,
+    parameter WIDTH = 8 , 
+    parameter OUT_WIDTH = WIDTH + 4 ,
     parameter N = 8
 ) (
     input  logic clk,
     input  logic rst_n,
-    input  logic upsample_out_valid,
-    input  logic signed [IN_WIDTH  - 1 : 0] data_i,
-    output logic signed [OUT_WIDTH - 1 : 0] data_o,
-    output logic gaussian_filter_out_valid
+
+    input  logic bit_upsample_valid_i,
+    input  logic signed [WIDTH - 1 : 0] bit_upsample_i,
+
+    input  logic signed [WIDTH - 1 : 0] tap_value_i,
+
+    output logic signed [OUT_WIDTH - 1  : 0] gauss_filter_o,
+    output logic gaussian_filter_out_valid_o
 );
 
 integer i;
+integer j;
 
-localparam signed [ IN_WIDTH -1 : 0 ] h [ N-1 : 0 ] = '{ 'd22, 'd30, 'd36, 'd40, 'd40, 'd36, 'd30, 'd22 };
-
-logic signed [IN_WIDTH - 1 : 0] store_in [N-1 : 0];
-logic signed [OUT_WIDTH - 1 : 0] acc;
+logic signed [WIDTH - 1 : 0] store_taps [N-1 : 0];
+logic signed [WIDTH - 1 : 0] pre_accum_taps [(2*N)-1 : 0];
+logic signed [OUT_WIDTH - 1  : 0] accum_sum;
 
 always @(posedge clk or negedge rst_n) begin
     if (!rst_n) begin
         for (i = 0; i < N; i++) begin
-            store_in[i] <= '0;
+            store_taps[i] <= '0;
         end
-        data_o <= 'b0;
-        gaussian_filter_out_valid <= 'b0;
+
+        for (j = 0; j < (2*N) ; j++) begin
+            pre_accum_taps[j] <= '0;
+        end
+
+        gauss_filter_o <= 'b0;
+        gaussian_filter_out_valid_o <= 'b0;
+
     end 
     else begin
-        if (upsample_out_valid) begin
-            gaussian_filter_out_valid <= 'b1;
+
+        if (bit_upsample_valid_i) begin
+
+            gaussian_filter_out_valid_o <= 'b1;
 
             for (i = N-1 ; i > 0 ; i-- ) begin
-                store_in[i] <= store_in[i-1];
+                store_taps[i] <= store_taps[i-1];
             end
 
-            store_in[0] <= data_i;
-
-            acc = 'd0;
+            store_taps[0] <= tap_value_i;
 
             for (i = 0; i < N; i++) begin
-                acc <= acc + (store_in[i] * h[i]);
+
+                if (bit_upsample_i [0]) begin
+                    pre_accum_taps [i] <= store_taps [i];
+                end
+                else begin
+                    pre_accum_taps [i] <= -store_taps [i];
+                end 
+                
+            end 
+            
+            for (i = N; i < 2*N; i++) begin
+                
+                if (bit_upsample_i [0]) begin
+                    pre_accum_taps [i] <= store_taps [2*N - i - 1];
+                end
+                else begin
+                    pre_accum_taps [i] <= -store_taps [2*N - i - 1];
+                end 
+
+            end 
+
+            accum_sum <= '0;
+            for (i = 0; i < 2*N; i++) begin
+                accum_sum <= accum_sum + pre_accum_taps[i];
             end
 
-            data_o <= acc;
+            gauss_filter_o <= accum_sum;
         end
-        
     end
 end    
 
