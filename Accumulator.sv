@@ -1,4 +1,4 @@
-module accumulator# (parameter OUT_WIDTH = 12; outputparameter DATA_WIDTH = 8)(
+module accumulator# (parameter OUT_WIDTH = 12, outputparameter DATA_WIDTH = 8)(
     input logic signed [OUT_WIDTH - 1 : 0] gauss_filter_o,  // Gaussian filter output
     input logic gaussian_filter_out_valid_o,                // Valid signal for the Gaussian filter output
     output logic [DATA_WIDTH - 1 : 0] Phase_index_i,        // Phase index output
