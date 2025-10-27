@@ -11,19 +11,24 @@ module gaussian_filter #(
 
     input  logic signed [WIDTH - 1 : 0] tap_value_i,
 
-    output logic signed [OUT_WIDTH - 1  : 0] gauss_filter_o,
+    output logic signed [OUT_WIDTH - 1  : 0] gaussian_filter_o,
     output logic gaussian_filter_out_valid_o
 );
 
-integer i;
-integer j;
+integer i , 
+        j ,
+        k ,
+        l ;
 
 logic signed [WIDTH - 1 : 0] store_taps [N-1 : 0];
 logic signed [WIDTH - 1 : 0] pre_accum_taps [(2*N)-1 : 0];
 logic signed [OUT_WIDTH - 1  : 0] accum_sum;
 
+
 always @(posedge clk or negedge rst_n) begin
+
     if (!rst_n) begin
+
         for (i = 0; i < N; i++) begin
             store_taps[i] <= '0;
         end
@@ -32,10 +37,12 @@ always @(posedge clk or negedge rst_n) begin
             pre_accum_taps[j] <= '0;
         end
 
-        gauss_filter_o <= 'b0;
+        gaussian_filter_o <= 'd0;
         gaussian_filter_out_valid_o <= 'b0;
+        accum_sum <= 'd0;
 
     end 
+
     else begin
 
         if (bit_upsample_valid_i) begin
@@ -48,34 +55,35 @@ always @(posedge clk or negedge rst_n) begin
 
             store_taps[0] <= tap_value_i;
 
-            for (i = 0; i < N; i++) begin
+            for (j = 0; j < N; j++) begin
 
-                if (bit_upsample_i [0]) begin
-                    pre_accum_taps [i] <= store_taps [i];
+                if (bit_upsample_i [j]) begin
+                    pre_accum_taps [j] <= store_taps [j];
                 end
                 else begin
-                    pre_accum_taps [i] <= -store_taps [i];
+                    pre_accum_taps [j] <= -store_taps [j];
                 end 
                 
             end 
             
-            for (i = N; i < 2*N; i++) begin
+            for (k = N; k < 2*N; k++) begin
                 
-                if (bit_upsample_i [0]) begin
-                    pre_accum_taps [i] <= store_taps [2*N - i - 1];
+                if (bit_upsample_i [k]) begin
+                    pre_accum_taps [k] <= store_taps [2*N - k - 1];
                 end
                 else begin
-                    pre_accum_taps [i] <= -store_taps [2*N - i - 1];
+                    pre_accum_taps [k] <= -store_taps [2*N - k - 1];
                 end 
 
             end 
 
-            accum_sum <= '0;
-            for (i = 0; i < 2*N; i++) begin
-                accum_sum <= accum_sum + pre_accum_taps[i];
+            accum_sum <= 'd0;
+            
+            for (l = 0; l < 2*N; l++) begin
+                accum_sum <= accum_sum + pre_accum_taps[l];
             end
 
-            gauss_filter_o <= accum_sum;
+            gaussian_filter_o <= accum_sum;
         end
     end
 end    
