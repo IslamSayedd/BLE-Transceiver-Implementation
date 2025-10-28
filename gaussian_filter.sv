@@ -7,23 +7,23 @@ module gaussian_filter #(
     input  logic clk,
     input  logic rst_n,
 
-    input  logic bit_upsample_valid_i,
-    input  logic [WIDTH - 1 : 0] bit_upsample_i,
+    input  logic bit_upsample_valid_i, //From Upsample Block (Take 8 1's or 8 0's)
+    input  logic [WIDTH - 1 : 0] bit_upsample_i, //From Upsample Block
 
-    input  logic [WIDTH - 1 : 0] tap_value_i,
-    input  logic [ADDRESS_WIDTH - 1 : 0] tap_address_i,
+    input  logic [WIDTH - 1 : 0] tap_value_i, //Interface Input
+    input  logic [ADDRESS_WIDTH - 1 : 0] tap_address_i, //Interface Input
 
     output logic signed [OUT_WIDTH - 1  : 0] gaussian_filter_o,
     output logic gaussian_filter_out_valid_o
 );
 
-integer i , 
-        j ,
-        k ,
-        l ;
+integer i ;
 
-logic [WIDTH - 1 : 0] store_taps [NUM_OF_TAPS-1 : 0];
-logic signed [WIDTH : 0] pre_accum_tap0;
+//A memory to store the values of the Taps
+logic [WIDTH - 1 : 0] store_taps [NUM_OF_TAPS-1 : 0]; 
+
+//Variables to map the tap values to positive or negative
+logic signed [WIDTH : 0] pre_accum_tap0; 
 logic signed [WIDTH : 0] pre_accum_tap1;
 logic signed [WIDTH : 0] pre_accum_tap2;
 logic signed [WIDTH : 0] pre_accum_tap3;
@@ -61,9 +61,9 @@ always @(posedge clk or negedge rst_n) begin
 
             gaussian_filter_out_valid_o <= 'b1;
 
-            store_taps [tap_address_i] <= tap_value_i;
+            store_taps [tap_address_i]  <= tap_value_i;
 
-            if (bit_upsample_i [0]) begin
+            if (bit_upsample_i [0]) begin // g(𝑡) = 𝑐(𝑡) ∗ ℎ(𝑡)        ℎ(𝑡) ---> taps      𝑐(𝑡) ---> Input
                 pre_accum_tap0 <= {1'b0 , store_taps [0]};
                 pre_accum_tap1 <= {1'b0 , store_taps [1]};
                 pre_accum_tap2 <= {1'b0 , store_taps [2]};
@@ -84,8 +84,10 @@ always @(posedge clk or negedge rst_n) begin
                 pre_accum_tap7 <= -store_taps [7];
             end  
         
-            gaussian_filter_o <= pre_accum_tap0 + pre_accum_tap1 + pre_accum_tap2 + pre_accum_tap3 + pre_accum_tap4 + pre_accum_tap5 + pre_accum_tap6 + pre_accum_tap7  ;
-        
+            gaussian_filter_o <= pre_accum_tap0 + pre_accum_tap1 + pre_accum_tap2 
+            + pre_accum_tap3 + pre_accum_tap4 + pre_accum_tap5 
+            + pre_accum_tap6 + pre_accum_tap7 ; // Summation {g(𝑡) = 𝑐(𝑡) ∗ ℎ(𝑡)}
+
         end
     end
 end    
