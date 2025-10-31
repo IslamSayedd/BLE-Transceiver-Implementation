@@ -1,50 +1,94 @@
 module gaussian_filter #(
-    parameter IN_WIDTH = 8 , 
-    parameter OUT_WIDTH = IN_WIDTH + IN_WIDTH ,
-    parameter N = 8
+    parameter WIDTH = 8 , 
+    parameter OUT_WIDTH = WIDTH + 4 ,
+    parameter ADDRESS_WIDTH = 4 ,
+    parameter NUM_OF_TAPS = 8
 ) (
     input  logic clk,
     input  logic rst_n,
-    input  logic upsample_out_valid,
-    input  logic signed [IN_WIDTH  - 1 : 0] data_i,
-    output logic signed [OUT_WIDTH - 1 : 0] data_o,
-    output logic gaussian_filter_out_valid
+
+    input  logic bit_upsample_valid_i, //From Upsample Block (Take 8 1's or 8 0's)
+    input  logic [WIDTH - 1 : 0] bit_upsample_i, //From Upsample Block
+
+    input  logic [WIDTH - 1 : 0] tap_value_i, //Interface Input
+    input  logic [ADDRESS_WIDTH - 1 : 0] tap_address_i, //Interface Input
+
+    output logic signed [OUT_WIDTH - 1  : 0] gaussian_filter_o,
+    output logic gaussian_filter_out_valid_o
 );
 
-integer i;
+integer i ;
 
-localparam signed [ IN_WIDTH -1 : 0 ] h [ N-1 : 0 ] = '{ 'd22, 'd30, 'd36, 'd40, 'd40, 'd36, 'd30, 'd22 };
+//A memory to store the values of the Taps
+logic [WIDTH - 1 : 0] store_taps [NUM_OF_TAPS-1 : 0]; 
 
-logic signed [IN_WIDTH - 1 : 0] store_in [N-1 : 0];
-logic signed [OUT_WIDTH - 1 : 0] acc;
+//Variables to map the tap values to positive or negative
+logic signed [WIDTH : 0] pre_accum_tap0; 
+logic signed [WIDTH : 0] pre_accum_tap1;
+logic signed [WIDTH : 0] pre_accum_tap2;
+logic signed [WIDTH : 0] pre_accum_tap3;
+logic signed [WIDTH : 0] pre_accum_tap4;
+logic signed [WIDTH : 0] pre_accum_tap5;
+logic signed [WIDTH : 0] pre_accum_tap6;
+logic signed [WIDTH : 0] pre_accum_tap7;
+
 
 always @(posedge clk or negedge rst_n) begin
+
     if (!rst_n) begin
-        for (i = 0; i < N; i++) begin
-            store_in[i] <= '0;
+
+        for (i = 0; i < NUM_OF_TAPS; i++) begin
+            store_taps[i] <= '0;
         end
-        data_o <= 'b0;
-        gaussian_filter_out_valid <= 'b0;
+
+        pre_accum_tap0 <= 'd0;
+        pre_accum_tap1 <= 'd0;
+        pre_accum_tap2 <= 'd0;
+        pre_accum_tap3 <= 'd0;
+        pre_accum_tap4 <= 'd0;
+        pre_accum_tap5 <= 'd0;
+        pre_accum_tap6 <= 'd0;
+        pre_accum_tap7 <= 'd0;
+
+        gaussian_filter_o <= 'd0;
+        gaussian_filter_out_valid_o <= 'b0;
+
     end 
+
     else begin
-        if (upsample_out_valid) begin
-            gaussian_filter_out_valid <= 'b1;
 
-            for (i = N-1 ; i > 0 ; i-- ) begin
-                store_in[i] <= store_in[i-1];
+        if (bit_upsample_valid_i) begin
+
+            gaussian_filter_out_valid_o <= 'b1;
+
+            store_taps [tap_address_i]  <= tap_value_i;
+
+            if (bit_upsample_i [0]) begin // g(𝑡) = 𝑐(𝑡) ∗ ℎ(𝑡)        ℎ(𝑡) ---> taps      𝑐(𝑡) ---> Input
+                pre_accum_tap0 <= {1'b0 , store_taps [0]};
+                pre_accum_tap1 <= {1'b0 , store_taps [1]};
+                pre_accum_tap2 <= {1'b0 , store_taps [2]};
+                pre_accum_tap3 <= {1'b0 , store_taps [3]};
+                pre_accum_tap4 <= {1'b0 , store_taps [4]};
+                pre_accum_tap5 <= {1'b0 , store_taps [5]};
+                pre_accum_tap6 <= {1'b0 , store_taps [6]};
+                pre_accum_tap7 <= {1'b0 , store_taps [7]};
             end
-
-            store_in[0] <= data_i;
-
-            acc = 'd0;
-
-            for (i = 0; i < N; i++) begin
-                acc <= acc + (store_in[i] * h[i]);
-            end
-
-            data_o <= acc;
-        end
+            else begin
+                pre_accum_tap0 <= -store_taps [0];
+                pre_accum_tap1 <= -store_taps [1];
+                pre_accum_tap2 <= -store_taps [2];
+                pre_accum_tap3 <= -store_taps [3];
+                pre_accum_tap4 <= -store_taps [4];
+                pre_accum_tap5 <= -store_taps [5];
+                pre_accum_tap6 <= -store_taps [6];
+                pre_accum_tap7 <= -store_taps [7];
+            end  
         
+            gaussian_filter_o <= pre_accum_tap0 + pre_accum_tap1 + pre_accum_tap2 
+            + pre_accum_tap3 + pre_accum_tap4 + pre_accum_tap5 
+            + pre_accum_tap6 + pre_accum_tap7 ; // Summation {g(𝑡) = 𝑐(𝑡) ∗ ℎ(𝑡)}
+
+        end
     end
 end    
 
