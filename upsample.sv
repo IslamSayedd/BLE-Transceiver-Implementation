@@ -6,8 +6,8 @@ module upsample #
   input wire clk,
   input wire rst_n,
 
-  input wire phy_bit_i,
-  input wire bit_valid_i,
+  input wire [1:0] NRZ_i,
+  input wire       NRZ_valid_i,
   
   output reg [ SAMPLE_PER_SYMBOL -1 : 0] bit_upsample_o,
   output reg bit_upsample_valid_o
@@ -35,13 +35,19 @@ always @ (posedge clk or negedge rst_n)
       end 
     else 
       begin
-        if (bit_valid_i) // for taking input if we will send 2 frames consecutive we must leave a clock cycle between them
+        if (NRZ_valid_i) // for taking input if we will send 2 frames consecutive we must leave a clock cycle between them
           begin 
             if (counter != DATA_WIDTH ) 
               begin 
-                   
-                  phy_bit_reg_in [counter] <=  phy_bit_i; //to store all the input (of DATA_WIDTH size) 
-                  counter <= counter + 'b1;
+                   if(NRZ_i[1]) begin
+                      phy_bit_reg_in [counter] <=  0; //to store all the input (of DATA_WIDTH size) +ve deviation (1) is stored as 1 and -ve is stored as 0
+                      counter <= counter + 'b1;
+                   end
+                   else begin
+                      phy_bit_reg_in [counter] <=  1;
+                      counter <= counter + 'b1;
+                   end
+                     
                end
             else 
               begin

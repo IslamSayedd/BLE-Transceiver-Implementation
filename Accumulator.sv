@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 module accumulator #(parameter OUT_WIDTH  = 12, parameter DATA_WIDTH = 8)(
     input  logic                         clk,
     input  logic                         reset_n,
@@ -7,6 +8,13 @@ module accumulator #(parameter OUT_WIDTH  = 12, parameter DATA_WIDTH = 8)(
 
     output logic        [DATA_WIDTH-1:0] Phase_index_i,           // Phase index (MSBs)
     output logic                         phase_valid_i
+=======
+module accumulator# (parameter OUT_WIDTH = 12, outputparameter DATA_WIDTH = 8)(
+    input logic signed [OUT_WIDTH - 1 : 0] gauss_filter_o,  // Gaussian filter output
+    input logic gaussian_filter_out_valid_o,                // Valid signal for the Gaussian filter output
+    output logic [DATA_WIDTH - 1 : 0] Phase_index_i,        // Phase index output
+    output logic phase_valid_i                              // Phase valid output
+>>>>>>> a3abae48121eb90b943fac2c0eceedc3f147f1e7
 );
 
     logic signed [OUT_WIDTH-1:0] accumulator_reg;
