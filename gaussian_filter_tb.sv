@@ -4,8 +4,8 @@ module gaussian_filter_tb ();
 ////////////////PARAMETERS DECLARATIONS////////////////
 parameter CLOCK_PERIOD = 5.0 ; 
 parameter IN_WIDTH = 8 ;
-parameter TAP_WIDTH = 14 ; 
-parameter OUT_WIDTH = 16 ;
+parameter TAP_WIDTH = 12 ; 
+parameter OUT_WIDTH = 13 ;
 parameter ADDRESS_WIDTH = 4 ;
 parameter NUM_OF_TAPS = 9 ;
 parameter NUM_SAMPLES = (NUM_OF_TAPS - 1) * 2 ; 
@@ -47,15 +47,13 @@ initial begin
     do_oper();
     #(CLOCK_PERIOD)
 
-    repeat(NUM_SAMPLES/2) begin
+    repeat((NUM_SAMPLES/2) + 1) begin
         generate_upsample_inputs(1'b1);
     end
 
-    repeat(NUM_SAMPLES/2) begin
+    repeat((NUM_SAMPLES/2)) begin
         generate_upsample_inputs(1'b0);
     end
-
-    #(CLOCK_PERIOD)
 
     bit_upsample_valid_i_tb = 'b0;
 
