@@ -37,11 +37,6 @@ logic [TAP_WIDTH - 1 : 0] store_taps [NUM_OF_TAPS - 1 : 0];
 logic signed [TAP_WIDTH : 0] pre_accum_tap [NUM_PRE_ACC_TAPS - 1 : 0]; 
 
 
-//Flag To Know The Filter Finished The Operation
-logic gaussian_filter_done;
-assign gaussian_filter_done = (pre_accum_tap [NUM_PRE_ACC_TAPS - 1] > 'd0)? 'b1 : 'b0;
-
-
 always @(posedge clk or negedge rst_n) begin
 
     if (!rst_n) begin
@@ -71,12 +66,17 @@ always @(posedge clk or negedge rst_n) begin
 
             samples [0] <= bit_upsample_i;
 
-            gaussian_filter_out_valid_o <= gaussian_filter_done;
+            gaussian_filter_out_valid_o <= 1'b1;
 
 
             // Summation {g(𝑡) = 𝑐(𝑡) ∗ ℎ(𝑡)}
             gaussian_filter_o  <= acc_comb;
-            
+
+        end
+
+        else begin
+            gaussian_filter_out_valid_o <= 1'b0;
+            gaussian_filter_o  <= 'd0;
         end
     end
 end  
