@@ -2,49 +2,63 @@
 module gaussian_filter_tb ();
 
 ////////////////PARAMETERS DECLARATIONS////////////////
-parameter Clock_PERIOD = 5.0 ; 
-parameter WIDTH = 8; 
-parameter OUT_WIDTH = WIDTH + 4;
+parameter CLOCK_PERIOD = 5.0 ; 
+parameter IN_WIDTH = 8 ;
+parameter TAP_WIDTH = 14 ; 
+parameter OUT_WIDTH = 16 ;
 parameter ADDRESS_WIDTH = 4 ;
-parameter NUM_OF_TAPS = 8;
+parameter NUM_OF_TAPS = 9 ;
+parameter NUM_SAMPLES = (NUM_OF_TAPS - 1) * 2 ; 
 
+////////////////SIGNALS DECLARATIONS////////////////
 logic clk_tb;
 logic rst_n_tb;
 
 logic bit_upsample_valid_i_tb;
-logic [WIDTH - 1 : 0] bit_upsample_i_tb;
+logic [IN_WIDTH - 1 : 0] bit_upsample_i_tb;
 
-logic [WIDTH - 1 : 0] tap_value_i_tb;
+logic [TAP_WIDTH - 1 : 0] tap_value_i_tb;
 logic [ADDRESS_WIDTH - 1 : 0] tap_address_i_tb;
 
 logic signed [OUT_WIDTH - 1  : 0] gaussian_filter_o_tb;
 logic gaussian_filter_out_valid_o_tb;
 
+////////////////MEMS DECLARATIONS////////////////
+logic [TAP_WIDTH - 1 : 0] taps [NUM_OF_TAPS - 1 : 0];
+
 ///////////////MAIN INITIAL BLOCK////////////////
 initial begin
 
     // System Functions
-    $dumpfile("UART_tx.vcd") ;       
+    $dumpfile("gaussian_filter.vcd") ;       
     $dumpvars; 
+
+    // Read Input Files
+    $readmemh("taps.txt", taps);
 
     //reset assertion
     assert_reset();
 
     //initialize
     initialize();
-    #(Clock_PERIOD)
+    #(CLOCK_PERIOD)
 
-    bit_upsample_i_tb = {WIDTH{1'b1}};
-    #(Clock_PERIOD)
+    //Load Taps
+    do_oper();
+    #(CLOCK_PERIOD)
 
-    generate_taps();
-    #(Clock_PERIOD);
-    #(Clock_PERIOD);
+    repeat(NUM_SAMPLES/2) begin
+        generate_upsample_inputs(1'b1);
+    end
 
-    bit_upsample_i_tb = {WIDTH{1'b0}};
-    
-    #(Clock_PERIOD);
-    
+    repeat(NUM_SAMPLES/2) begin
+        generate_upsample_inputs(1'b0);
+    end
+
+    #(CLOCK_PERIOD)
+
+    bit_upsample_valid_i_tb = 'b0;
+
     
     #50
     $stop;
@@ -65,60 +79,44 @@ endtask
 task assert_reset;
     begin
         rst_n_tb =  1'b1;
-        #(Clock_PERIOD)
+        #(CLOCK_PERIOD)
         rst_n_tb  = 1'b0;
-        #(Clock_PERIOD)
+        #(CLOCK_PERIOD)
         rst_n_tb  = 1'b1;
     end
 endtask
 
-task generate_taps;
+task do_oper;
+    integer j;
     begin
+        for (j = 0; j < NUM_OF_TAPS; j = j + 1) begin
+            tap_address_i_tb = j;
+            tap_value_i_tb = taps[j];
+            #(CLOCK_PERIOD);
+        end
+    end
+endtask
 
-        bit_upsample_valid_i_tb = 1'b1;
-        #(Clock_PERIOD)
-
-        tap_address_i_tb  = 'd0;
-        tap_value_i_tb    = 'd55;
-
-        #(Clock_PERIOD)
-
-        tap_address_i_tb = 'd1;
-        tap_value_i_tb    = 'd96;
-
-        #(Clock_PERIOD)
-
-        tap_address_i_tb = 'd2;
-        tap_value_i_tb = 'd135;
-
-        #(Clock_PERIOD)
-        tap_address_i_tb = 'd3;
-        tap_value_i_tb = 'd151; 
-
-        #(Clock_PERIOD)
-        tap_address_i_tb = 'd4;
-        tap_value_i_tb = 'd151;
-
-        #(Clock_PERIOD)
-        tap_address_i_tb = 'd5;
-        tap_value_i_tb    = 'd135;
-
-        #(Clock_PERIOD)
-        tap_address_i_tb = 'd6;
-        tap_value_i_tb    = 'd96;
-
-        #(Clock_PERIOD)
-        tap_address_i_tb = 'd7;
-        tap_value_i_tb    = 'd55;
+task generate_upsample_inputs(input logic value);
+    begin
+        bit_upsample_valid_i_tb = 'b1;
+        if (value) begin
+            bit_upsample_i_tb = {IN_WIDTH{1'b1}};
+        end 
+        else begin
+            bit_upsample_i_tb = {IN_WIDTH{1'b0}};
+        end
+        #(CLOCK_PERIOD);
     end
 endtask
 
 
 ////////////////CLK GENERATION////////////////
-always #(Clock_PERIOD/2) clk_tb = ~ clk_tb;
+always #(CLOCK_PERIOD/2) clk_tb = ~ clk_tb;
 
 ////////////////MODULE INSTANTIATION////////////////
-gaussian_filter #(.WIDTH(WIDTH) , .OUT_WIDTH(OUT_WIDTH) , .NUM_OF_TAPS(NUM_OF_TAPS)) DUT
+gaussian_filter #(.IN_WIDTH(IN_WIDTH) , .TAP_WIDTH(TAP_WIDTH) , .OUT_WIDTH(OUT_WIDTH) , .NUM_OF_TAPS(NUM_OF_TAPS) , .ADDRESS_WIDTH(ADDRESS_WIDTH)) 
+DUT
 ( 
     .clk(clk_tb), 
     .rst_n(rst_n_tb) , 
