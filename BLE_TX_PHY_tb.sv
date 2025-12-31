@@ -1,6 +1,6 @@
 `timescale 1ns/1ps
 
-module BLE_Transmitter_tb ();
+module BLE_TX_PHY_tb ();
 
     //==========================================================================
     // Parameters
@@ -16,9 +16,9 @@ module BLE_Transmitter_tb ();
     parameter NUM_OF_TAPS          = 9;
     
     // VCO parameters
-    parameter VCO_OUT_WIDTH        = 12;
-    parameter VCO_DATA_WIDTH       = 8;
-    parameter VCO_OUT_SIZE         = 8;
+    parameter VCO_OUT_WIDTH        = 16;
+    parameter VCO_DATA_WIDTH       = 12;
+    parameter VCO_OUT_SIZE         = 12;
     
     // Testbench parameters
     parameter Clock_PERIOD         = 20;  // 50 MHz
@@ -229,7 +229,7 @@ task do_oper;
         for (j = 0; j < NUM_OF_TAPS; j = j + 1) begin
             tap_address_i_tb = j;
             tap_value_i_tb = taps[j];
-            #(CLOCK_PERIOD);
+            #(Clock_PERIOD);
         end
     end
 endtask
