@@ -14,16 +14,13 @@ module upsample #
 );
 
 integer counter;
-integer i;
 integer counter_out;
 integer loop_out;
 
 reg                             phy_bit_reg_in;
 reg [ SAMPLE_PER_SYMBOL -1 : 0] bit_upsample_reg [DATA_WIDTH - 1 : 0];
-reg done;
-wire valid;
 wire out_flag;
-reg flag_done;
+
 
 always @ (posedge clk or negedge rst_n) 
   begin
@@ -36,14 +33,14 @@ always @ (posedge clk or negedge rst_n)
         phy_bit_reg_in <= 'b0;
         loop_out <= 'b0;
         counter_out <= 'b0;
-        flag_done <='b0;
+
         
       end 
     else 
       begin
         if (NRZ_valid_i) // for taking input if we will send 2 frames consecutive we must leave a clock cycle between them
           begin 
-            bit_upsample_reg [counter] <= {SAMPLE_PER_SYMBOL{!NRZ_i[1]}};  
+            
             if(counter == DATA_WIDTH) begin
              counter <= 'b0;
             end
@@ -79,7 +76,18 @@ always @ (posedge clk or negedge rst_n)
     end    
 end
 
+always @(*) begin
+  if(NRZ_valid_i) begin
+    bit_upsample_reg [counter] = {SAMPLE_PER_SYMBOL{!NRZ_i[1]}}; 
+    
+  end
+  else 
+    begin
+          bit_upsample_reg [counter] = 'b0;
 
+    end
+   
+end
 //assign valid = ((NRZ_valid_i)  )? 'b1 : 'b0;
-assign out_flag = ((NRZ_valid_i && counter !=0 )|| counter_out!= 'b0) && !(counter_out == DATA_WIDTH && loop_out == 1) ? 'b1:'b0;
+assign out_flag = ((NRZ_valid_i)|| counter_out!= 'b0) && !(counter_out == DATA_WIDTH && loop_out == 1) ? 'b1:'b0;
 endmodule
