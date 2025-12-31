@@ -5,7 +5,7 @@ module NRZ_upsample_tb # ( parameter DATA_WIDTH = 11 ,  SAMPLE_PER_SYMBOL = 8 )(
  reg                           		 clk;
  reg          		          		 phy_bit_i_tb;
  reg                          		 bit_valid_i_tb;
- wire	[SAMPLE_PER_SYMBOL - 1 : 0]  bit_upsample_o;
+ wire								 bit_upsample_o;
  wire 						  		 bit_upsample_valid_o;
 
 parameter Clock_PERIOD = 20 ;
@@ -26,13 +26,9 @@ initial
  @(negedge clk);
  take_input ('b10100010101);
 
- @(negedge clk);
- @(negedge clk);
+
  
- @(negedge clk);
-  @(negedge clk);
- @(negedge clk);
-  @(negedge clk);
+ #(150 * Clock_PERIOD)
  @(negedge clk);
  
 
@@ -43,7 +39,7 @@ initial
 
 
 
-#(30 * Clock_PERIOD)
+#(100 * Clock_PERIOD)
 
  $stop;
 end

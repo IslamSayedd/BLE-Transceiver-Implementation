@@ -5,7 +5,7 @@ module upsample_tb # ( parameter DATA_WIDTH = 11 ,  SAMPLE_PER_SYMBOL = 8 )();
  reg                          clk;
  reg          [1:0]           NRZ_i_tb;
  reg                          NRZ_valid_i_tb;
- wire [ SAMPLE_PER_SYMBOL -1 : 0]  bit_upsample_tb;
+ wire 						  bit_upsample_tb;
  wire                         bit_upsample_valid_tb;
 
 parameter Clock_PERIOD = 20 ;
@@ -27,7 +27,7 @@ initial
  take_input ('b10100010101);
 
 
- 
+ #(150 * Clock_PERIOD)
  @(negedge clk);
  take_input ('b01001011010);
  
@@ -36,7 +36,7 @@ initial
 
 
 
-#(30 * Clock_PERIOD)
+#(1000 * Clock_PERIOD)
 
  $stop;
 end
@@ -80,7 +80,7 @@ begin
 		NRZ_valid_i_tb ='b1;
 		#(Clock_PERIOD);
 	end
-	//bit_valid_tb = 'b0;
+	NRZ_valid_i_tb= 'b0;
 	#(Clock_PERIOD);
 end
 endtask

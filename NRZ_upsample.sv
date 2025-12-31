@@ -5,7 +5,7 @@ module NRZ_upsample # (parameter DATA_WIDTH = 11,
  input   wire                         rst_n,
  input   wire                         phy_bit_i,
  input   wire                         bit_valid_i, 
- output  wire   [SAMPLE_PER_SYMBOL - 1 : 0]  bit_upsample_o,
+ output  wire   					  bit_upsample_o,
  output  wire                         		 bit_upsample_valid_o
 
  );
