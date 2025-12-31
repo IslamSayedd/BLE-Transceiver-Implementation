@@ -1,5 +1,6 @@
 `timescale 1ns/1ps
-module BLE_TX_PHY_tb ();
+
+module BLE_Transmitter_tb ();
 
     //==========================================================================
     // Parameters
@@ -39,6 +40,8 @@ module BLE_TX_PHY_tb ();
     // Test pattern storage
     reg [NRZ_DATA_WIDTH-1:0]        test_message;
     integer                         bit_index;
+
+    logic [TAP_WIDTH - 1 : 0] taps [NUM_OF_TAPS - 1 : 0];
     
     //==========================================================================
     // Initial Block
@@ -52,13 +55,17 @@ module BLE_TX_PHY_tb ();
         $readmemh("sin_lut.txt", DUT.u_vco.u_iq_wave_generator.sin_mem);
         $readmemh("cos_lut.txt", DUT.u_vco.u_iq_wave_generator.cos_mem);
         
-        // Initialize Gaussian filter coefficients
-        initialize_gaussian_taps();
+        // Load Gaussian filter taps from file
+        //$readmemh("taps.txt", DUT.u_gaussian_filter.store_taps);
+        $readmemh("taps.txt", taps);
         
         initialize();
         
         @(negedge clk);
         reset();
+
+        repeat(5) @(negedge clk);
+        do_oper();
         
         // Wait for stable state
         repeat(5) @(negedge clk);
@@ -141,43 +148,6 @@ module BLE_TX_PHY_tb ();
         end
     endtask
     
-    // Initialize Gaussian filter tap coefficients
-    // These are example coefficients - adjust based on your filter design
-    task initialize_gaussian_taps;
-        integer i;
-        reg [TAP_WIDTH-1:0] tap_coefficients [0:NUM_OF_TAPS-1];
-        begin
-            // Example Gaussian filter coefficients (normalized)
-            // Adjust these values based on your specific filter requirements
-            tap_coefficients[0] = 16'h0100;  // ~0.00390625
-            tap_coefficients[1] = 16'h0800;  // ~0.03125
-            tap_coefficients[2] = 16'h1800;  // ~0.09375
-            tap_coefficients[3] = 16'h2800;  // ~0.15625
-            tap_coefficients[4] = 16'h3000;  // ~0.1875 (center tap)
-            tap_coefficients[5] = 16'h2800;  // ~0.15625
-            tap_coefficients[6] = 16'h1800;  // ~0.09375
-            tap_coefficients[7] = 16'h0800;  // ~0.03125
-            tap_coefficients[8] = 16'h0100;  // ~0.00390625
-            
-            $display("[%0t] Loading Gaussian filter coefficients...", $time);
-            
-            for (i = 0; i < NUM_OF_TAPS; i = i + 1) begin
-                @(negedge clk);
-                tap_address_i_tb = i;
-                tap_value_i_tb   = tap_coefficients[i];
-                #(Clock_PERIOD);
-                $display("  Tap[%0d] = 0x%h", i, tap_coefficients[i]);
-            end
-            
-            // Reset tap interface after loading
-            @(negedge clk);
-            tap_address_i_tb = 'b0;
-            tap_value_i_tb   = 'b0;
-            
-            $display("[%0t] Gaussian filter coefficients loaded", $time);
-        end
-    endtask
-    
     // Send an 11-bit message
     task send_message;
         input [NRZ_DATA_WIDTH-1:0] message;
@@ -214,7 +184,7 @@ module BLE_TX_PHY_tb ();
     //==========================================================================
     // DUT Instantiation
     //==========================================================================
-    BLE_Transmitter #(
+    BLE_TX_PHY #(
         .NRZ_DATA_WIDTH     (NRZ_DATA_WIDTH),
         .SAMPLE_PER_SYMBOL  (SAMPLE_PER_SYMBOL),
         .TAP_WIDTH          (TAP_WIDTH),
@@ -252,5 +222,16 @@ module BLE_TX_PHY_tb ();
                      $time, In_Phase_o_tb, Quadrature_Phase_o_tb);
         end
     end
+
+task do_oper;
+    integer j;
+    begin
+        for (j = 0; j < NUM_OF_TAPS; j = j + 1) begin
+            tap_address_i_tb = j;
+            tap_value_i_tb = taps[j];
+            #(CLOCK_PERIOD);
+        end
+    end
+endtask
 
 endmodule
