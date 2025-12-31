@@ -3,19 +3,18 @@ module gaussian_filter_tb ();
 
 ////////////////PARAMETERS DECLARATIONS////////////////
 parameter CLOCK_PERIOD = 5.0 ; 
-parameter IN_WIDTH = 8 ;
-parameter TAP_WIDTH = 12 ; 
-parameter OUT_WIDTH = 13 ;
+
+parameter TAP_WIDTH = 16 ; 
+parameter OUT_WIDTH = 16 ; 
 parameter ADDRESS_WIDTH = 4 ;
 parameter NUM_OF_TAPS = 9 ;
-parameter NUM_SAMPLES = (NUM_OF_TAPS - 1) * 2 ; 
 
 ////////////////SIGNALS DECLARATIONS////////////////
 logic clk_tb;
 logic rst_n_tb;
 
 logic bit_upsample_valid_i_tb;
-logic [IN_WIDTH - 1 : 0] bit_upsample_i_tb;
+logic bit_upsample_i_tb;
 
 logic [TAP_WIDTH - 1 : 0] tap_value_i_tb;
 logic [ADDRESS_WIDTH - 1 : 0] tap_address_i_tb;
@@ -25,6 +24,10 @@ logic gaussian_filter_out_valid_o_tb;
 
 ////////////////MEMS DECLARATIONS////////////////
 logic [TAP_WIDTH - 1 : 0] taps [NUM_OF_TAPS - 1 : 0];
+
+////////////////Golden Model Signals////////////////
+logic signed [TAP_WIDTH : 0] mapped_value_tb ;
+logic signed [OUT_WIDTH - 1  : 0] golden_out;
 
 ///////////////MAIN INITIAL BLOCK////////////////
 initial begin
@@ -38,22 +41,24 @@ initial begin
 
     //reset assertion
     assert_reset();
+    #(CLOCK_PERIOD)
 
     //initialize
     initialize();
     #(CLOCK_PERIOD)
 
     //Load Taps
+    
     do_oper();
     #(CLOCK_PERIOD)
 
-    repeat((NUM_SAMPLES/2) + 1) begin
-        generate_upsample_inputs(1'b1);
-    end
+    generate_upsample_inputs(1'b1);
 
-    repeat((NUM_SAMPLES/2)) begin
-        generate_upsample_inputs(1'b0);
-    end
+    generate_upsample_inputs(1'b1);
+
+    generate_upsample_inputs(1'b0);
+
+    generate_upsample_inputs(1'b0);
 
     bit_upsample_valid_i_tb = 'b0;
 
@@ -71,6 +76,8 @@ task initialize;
         bit_upsample_i_tb = 'd0;
         tap_value_i_tb = 'd0;
         tap_address_i_tb = 'd0;
+        golden_out = 'd0;
+        mapped_value_tb = 'd0;
     end
 endtask
 
@@ -99,21 +106,65 @@ task generate_upsample_inputs(input logic value);
     begin
         bit_upsample_valid_i_tb = 'b1;
         if (value) begin
-            bit_upsample_i_tb = {IN_WIDTH{1'b1}};
+            bit_upsample_i_tb = 1'b1;
+            #(CLOCK_PERIOD);
+            bit_upsample_i_tb = 1'b1;
+            #(CLOCK_PERIOD);
+            bit_upsample_i_tb = 1'b1;
+            #(CLOCK_PERIOD);
+            bit_upsample_i_tb = 1'b1;
+            #(CLOCK_PERIOD);
+            bit_upsample_i_tb = 1'b1;
+            #(CLOCK_PERIOD);
+            bit_upsample_i_tb = 1'b1;
+            #(CLOCK_PERIOD);
+            bit_upsample_i_tb = 1'b1;
+            #(CLOCK_PERIOD);
+            bit_upsample_i_tb = 1'b1;
+            #(CLOCK_PERIOD);
         end 
         else begin
-            bit_upsample_i_tb = {IN_WIDTH{1'b0}};
+            bit_upsample_i_tb = 1'b0;
+            #(CLOCK_PERIOD)
+            bit_upsample_i_tb = 1'b0;
+            #(CLOCK_PERIOD)
+            bit_upsample_i_tb = 1'b0;
+            #(CLOCK_PERIOD)
+            bit_upsample_i_tb = 1'b0;
+            #(CLOCK_PERIOD)
+            bit_upsample_i_tb = 1'b0;
+            #(CLOCK_PERIOD)
+            bit_upsample_i_tb = 1'b0;
+            #(CLOCK_PERIOD)
+            bit_upsample_i_tb = 1'b0;
+            #(CLOCK_PERIOD)
+            bit_upsample_i_tb = 1'b0;
+            #(CLOCK_PERIOD);
         end
-        #(CLOCK_PERIOD);
     end
 endtask
+
+/*task Check_value;
+    begin
+        #(CLOCK_PERIOD/2);
+        mapped_value_tb  = (&bit_upsample_i_tb) ? {1'b0 , tap_value_i_tb} : -tap_value_i_tb;
+        golden_out = mapped_value_tb + golden_out;
+        if (golden_out == gaussian_filter_o_tb) begin
+            $display("PASS @ %0t | Output=%0d" , $time, gaussian_filter_o_tb);
+        end 
+        else begin
+            $display("Fail @ %0t | Output=%0d | Expecting=%0d " , $time, gaussian_filter_o_tb , golden_out);
+        end
+    end
+endtask*/
+
 
 
 ////////////////CLK GENERATION////////////////
 always #(CLOCK_PERIOD/2) clk_tb = ~ clk_tb;
 
 ////////////////MODULE INSTANTIATION////////////////
-gaussian_filter #(.IN_WIDTH(IN_WIDTH) , .TAP_WIDTH(TAP_WIDTH) , .OUT_WIDTH(OUT_WIDTH) , .NUM_OF_TAPS(NUM_OF_TAPS) , .ADDRESS_WIDTH(ADDRESS_WIDTH)) 
+gaussian_filter #(.TAP_WIDTH(TAP_WIDTH) , .OUT_WIDTH(OUT_WIDTH) , .NUM_OF_TAPS(NUM_OF_TAPS) , .ADDRESS_WIDTH(ADDRESS_WIDTH)) 
 DUT
 ( 
     .clk(clk_tb), 
