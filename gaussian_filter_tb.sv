@@ -144,22 +144,6 @@ task generate_upsample_inputs(input logic value);
     end
 endtask
 
-/*task Check_value;
-    begin
-        #(CLOCK_PERIOD/2);
-        mapped_value_tb  = (&bit_upsample_i_tb) ? {1'b0 , tap_value_i_tb} : -tap_value_i_tb;
-        golden_out = mapped_value_tb + golden_out;
-        if (golden_out == gaussian_filter_o_tb) begin
-            $display("PASS @ %0t | Output=%0d" , $time, gaussian_filter_o_tb);
-        end 
-        else begin
-            $display("Fail @ %0t | Output=%0d | Expecting=%0d " , $time, gaussian_filter_o_tb , golden_out);
-        end
-    end
-endtask*/
-
-
-
 ////////////////CLK GENERATION////////////////
 always #(CLOCK_PERIOD/2) clk_tb = ~ clk_tb;
 
