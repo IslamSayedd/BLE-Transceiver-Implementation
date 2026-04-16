@@ -6,7 +6,7 @@ module Gain_Control # (parameter POWER_TARGET = 33'd4294967296, //2^32= 0.5((2^3
  input   wire                         clk,
  input   wire                         rst_n,
 
- input   wire       [ IN_SIZE-1 : 0 ] power_i,
+ input   wire             [ IN_SIZE-1 : 0 ] power_i,
  input   wire                         power_valid_i, 
 
  output  reg   	[ OUT-1 : 0 ]    	  gain_o,
@@ -15,7 +15,7 @@ module Gain_Control # (parameter POWER_TARGET = 33'd4294967296, //2^32= 0.5((2^3
  );
  
  reg signed [ OUT-1 : 0 ] error; 
- reg 	    [ OUT-1 : 0 ] gain_old , gain_temp;
+ reg signed	[ OUT-1 : 0 ] gain_old , gain_temp;
  reg 			 		  Done;
 
 
@@ -49,7 +49,7 @@ always @(*) begin
 	if(power_valid_i) 
 		begin
 
-			error = $signed(POWER_TARGET) - $signed({1'b0,power_i});
+			error = $signed({1'b0,POWER_TARGET}) - $signed({1'b0,power_i});
  			gain_temp = gain_old + (error >>> STEP_SIZE) ; //Arithmatic shift preserve the sign
  			Done ='b1;
 
