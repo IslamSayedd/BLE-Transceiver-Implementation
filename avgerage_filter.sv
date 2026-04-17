@@ -15,36 +15,39 @@ module avgerage_filter #(
 
     reg [DATA_WIDTH-1:0] buffer [0:N-1];
     reg [N_LOG2-1:0] wr_ptr;
-    reg [DATA_WIDTH + N_LOG2 : 0] sum;
+    reg [DATA_WIDTH + N_LOG2 -1 : 0] sum;
 
     integer i;
+wire [DATA_WIDTH + N_LOG2 -1 : 0] sum_next;
 
-    always @(posedge clk or negedge rst) begin
-        if (!rst) begin
-            wr_ptr    <= 0;
-            sum       <= 0;
-            avg_out_o   <= 0;
-            valid_out_o <= 0;
+assign sum_next = sum - buffer[wr_ptr] + data_in_i;
 
-            for (i = 0; i < N; i = i + 1)
-                buffer[i] <= 0;
+always @(posedge clk or negedge rst) begin
+    if (!rst) begin
+        wr_ptr       <= 0;
+        sum          <= 0;
+        avg_out_o    <= 0;
+        valid_out_o  <= 0;
 
-        end else if (valid_in_i) begin
+        for (i = 0; i < N; i = i + 1)
+            buffer[i] <= 0;
 
-            // Subtract oldest sample
-            sum <= sum - buffer[wr_ptr] + data_in_i;
+    end else if (valid_in_i) begin
 
-            // Store new sample
-            buffer[wr_ptr] <= data_in_i;
+        // Update sum
+        sum <= sum_next;
 
-            // Update pointer
-            wr_ptr <= wr_ptr + 1;
+        // Store new sample
+        buffer[wr_ptr] <= data_in_i;
 
-            // Compute average
-            avg_out_o <= sum >> N_LOG2;
+        // Update pointer
+        wr_ptr <= wr_ptr + 1;
 
-            valid_out_o <= 1;
-        end
+        // Use UPDATED sum
+        avg_out_o <= sum_next >> N_LOG2;
+
+        valid_out_o <= 1;
     end
+end
 
 endmodule

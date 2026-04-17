@@ -7,15 +7,13 @@ module Power_Estimator #( parameter N = 16 )(
     input  wire signed [N-1:0]      I_in,
     input  wire signed [N-1:0]      Q_in,
 
-    output reg  [2*N:0]             power_out,
+    output reg  [2*N-1:0]             power_out,
     output reg                      valid_out
 );
 
     reg [N-1:0] abs_I, abs_Q;          
     reg [2*N-1:0] I_sq, Q_sq;
     reg [2*N:0]   power_sum;
-
-    reg valid_d;
 
     integer i;
 
@@ -44,9 +42,9 @@ module Power_Estimator #( parameter N = 16 )(
         begin
             if (!rst_n) 
                 begin
+                    power_sum <= 0;
                     power_out <= 0;
                     valid_out <= 0;
-                    valid_d   <= 0;
                 end 
             else if (valid_in) 
                 begin
