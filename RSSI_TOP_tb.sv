@@ -69,6 +69,90 @@ initial begin
     // TC8: Negative I/Q values (same power)
     drive_input(-3000, -3000, 1);
 
+    // TC1: No signal
+    drive_input(0, 0, 1);
+
+    // TC2: Very weak signal
+    drive_input(20, 20, 1);
+
+    // TC3: Weak signal near threshold
+    drive_input(800, 800, 1);
+
+     // TC: Strong signal
+    drive_input(8, 7, 1);
+
+    // TC4: Around threshold (~ -70 dBm)
+    drive_input(1000, 1000, 1);
+
+    // TC5: Slightly above threshold
+    drive_input(1300, 1300, 1);
+
+    // TC6: Medium signal
+    drive_input(3000, 3000, 1);
+
+    // TC7: Strong signal
+    drive_input(8000, 8000, 1);
+
+    // TC8: Negative I/Q values (same power)
+    drive_input(-3000, -3000, 1);
+
+    // TC1: No signal
+    drive_input(0, 0, 1);
+
+    // TC2: Very weak signal
+    drive_input(20, 20, 1);
+
+    // TC3: Weak signal near threshold
+    drive_input(800, 800, 1);
+
+     // TC: Strong signal
+    drive_input(8, 7, 1);
+
+    // TC4: Around threshold (~ -70 dBm)
+    drive_input(1000, 1000, 1);
+
+    // TC5: Slightly above threshold
+    drive_input(1300, 1300, 1);
+
+    // TC6: Medium signal
+    drive_input(3000, 3000, 1);
+
+    // TC7: Strong signal
+    drive_input(8000, 8000, 1);
+
+    // TC8: Negative I/Q values (same power)
+    drive_input(-3000, -3000, 1);
+
+    // TC1: No signal
+    drive_input(0, 0, 1);
+
+    // TC2: Very weak signal
+    drive_input(20, 20, 1);
+
+    // TC3: Weak signal near threshold
+    drive_input(800, 800, 1);
+
+     // TC: Strong signal
+    drive_input(8, 7, 1);
+
+    // TC4: Around threshold (~ -70 dBm)
+    drive_input(1000, 1000, 1);
+
+    // TC5: Slightly above threshold
+    drive_input(1300, 1300, 1);
+
+    // TC6: Medium signal
+    drive_input(3000, 3000, 1);
+
+    // TC7: Strong signal
+    drive_input(8000, 8000, 1);
+
+    // TC8: Negative I/Q values (same power)
+    drive_input(-3000, -3000, 1);
+
+    // TC9: zero valid
+    drive_input(-3000, -3000, 0);
+
     #(20 * Clock_PERIOD);
 
     $stop;
