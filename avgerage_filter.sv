@@ -18,36 +18,41 @@ module avgerage_filter #(
     reg [DATA_WIDTH + N_LOG2 -1 : 0] sum;
 
     integer i;
-wire [DATA_WIDTH + N_LOG2 -1 : 0] sum_next;
 
-assign sum_next = sum - buffer[wr_ptr] + data_in_i;
+    // Effective input (real data or zero)
+    wire [DATA_WIDTH-1:0] data_eff;
+    assign data_eff = (valid_in_i) ? data_in_i : {DATA_WIDTH{1'b0}};
 
-always @(posedge clk or negedge rst) begin
-    if (!rst) begin
-        wr_ptr       <= 0;
-        sum          <= 0;
-        avg_out_o    <= 0;
-        valid_out_o  <= 0;
+    // Next sum calculation
+    wire [DATA_WIDTH + N_LOG2 -1 : 0] sum_next;
+    assign sum_next = sum - buffer[wr_ptr] + data_eff;
 
-        for (i = 0; i < N; i = i + 1)
-            buffer[i] <= 0;
+    always @(posedge clk or negedge rst) begin
+        if (!rst) begin
+            wr_ptr       <= 0;
+            sum          <= 0;
+            avg_out_o    <= 0;
+            valid_out_o  <= 0;
 
-    end else if (valid_in_i) begin
+            for (i = 0; i < N; i = i + 1)
+                buffer[i] <= 0;
 
-        // Update sum
-        sum <= sum_next;
+        end else begin
+            // Update sum
+            sum <= sum_next;
 
-        // Store new sample
-        buffer[wr_ptr] <= data_in_i;
+            // Store effective sample (real or zero)
+            buffer[wr_ptr] <= data_eff;
 
-        // Update pointer
-        wr_ptr <= wr_ptr + 1;
+            // Update pointer
+            wr_ptr <= wr_ptr + 1;
 
-        // Use UPDATED sum
-        avg_out_o <= sum_next >> N_LOG2;
+            // Compute average
+            avg_out_o <= sum_next >> N_LOG2;
 
-        valid_out_o <= 1;
+            // Output always valid (since filter always runs)
+            valid_out_o <= 1;
+        end
     end
-end
 
 endmodule
