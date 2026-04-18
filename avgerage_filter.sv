@@ -15,34 +15,42 @@ module avgerage_filter #(
 
     reg [DATA_WIDTH-1:0] buffer [0:N-1];
     reg [N_LOG2-1:0] wr_ptr;
-    reg [DATA_WIDTH + N_LOG2 : 0] sum;
+    reg [DATA_WIDTH + N_LOG2 -1 : 0] sum;
 
     integer i;
 
+    // Effective input (real data or zero)
+    wire [DATA_WIDTH-1:0] data_eff;
+    assign data_eff = (valid_in_i) ? data_in_i : {DATA_WIDTH{1'b0}};
+
+    // Next sum calculation
+    wire [DATA_WIDTH + N_LOG2 -1 : 0] sum_next;
+    assign sum_next = sum - buffer[wr_ptr] + data_eff;
+
     always @(posedge clk or negedge rst) begin
         if (!rst) begin
-            wr_ptr    <= 0;
-            sum       <= 0;
-            avg_out_o   <= 0;
-            valid_out_o <= 0;
+            wr_ptr       <= 0;
+            sum          <= 0;
+            avg_out_o    <= 0;
+            valid_out_o  <= 0;
 
             for (i = 0; i < N; i = i + 1)
                 buffer[i] <= 0;
 
-        end else if (valid_in_i) begin
+        end else begin
+            // Update sum
+            sum <= sum_next;
 
-            // Subtract oldest sample
-            sum <= sum - buffer[wr_ptr] + data_in_i;
-
-            // Store new sample
-            buffer[wr_ptr] <= data_in_i;
+            // Store effective sample (real or zero)
+            buffer[wr_ptr] <= data_eff;
 
             // Update pointer
             wr_ptr <= wr_ptr + 1;
 
             // Compute average
-            avg_out_o <= sum >> N_LOG2;
+            avg_out_o <= sum_next >> N_LOG2;
 
+            // Output always valid (since filter always runs)
             valid_out_o <= 1;
         end
     end
