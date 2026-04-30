@@ -1,0 +1,32 @@
+					Blocks
+	Abdelrahman					Shawky
+
+	PHY_agent.sv					PHY_env.sv
+	PHY_sqr.sv					PHY_coverage.sv
+	PHY_driver.sv					PHY_monitor.sv
+	PHY_seq_item.sv					PHY_test.sv
+	PHY_sequence.sv					PHY_sva.sv
+				       PHY_sb.sv
+	
+/////////////////////////////////////////////////////////////////////////
+
+	Naming_Of_Packages
+	filename_pkg
+	
+/////////////////////////////////////////////////////////////////////////
+
+	Naming_Of_Classes
+	filename (eg:- PHY_agent)
+
+	creating class instances
+	PHY_coverage cov
+	PHY_agent agt;
+    PHY_sb sb;
+	PHY_seq_item seq_item_cov; -----> In coverage Block
+
+/////////////////////////////////////////////////////////////////////////
+
+	Naming_Of_Ports
+	uvm_analysis_export #(PHY_seq_item) cov_export;
+    	uvm_tlm_analysis_fifo #(PHY_seq_item) cov_fifo;
+
