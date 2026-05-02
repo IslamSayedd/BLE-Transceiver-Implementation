@@ -15,10 +15,6 @@ module agc_top #(
     input  wire signed [IQ_WIDTH-1:0]  I_in_i,
     input  wire signed [IQ_WIDTH-1:0]  Q_in_i,
 
-    // Gain output
-    output wire [GAIN_WIDTH-1:0]       gain_o,
-    output wire                        gain_valid_o,
-
     // Corrected IQ output — 12-bit native width
     output reg  signed [IQ_WIDTH-1:0]  I_out_o,
     output reg  signed [IQ_WIDTH-1:0]  Q_out_o,
@@ -28,6 +24,8 @@ module agc_top #(
     /////////////////////////////////////////////
     //////////////Internal signals//////////////
     /////////////////////////////////////////////
+    wire [GAIN_WIDTH-1:0]       gain_o,
+    wire                        gain_valid_o,
 
     // Sign-extend 12-bit → 16-bit for internal math precision
     wire signed [AGC_IQ_WIDTH-1:0] I_ext;

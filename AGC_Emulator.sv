@@ -78,8 +78,6 @@ module channel_emulator #(
     // Applies gain G, clips back to 12-bit, outputs corrected I/Q directly.
     // =========================================================================
 
-    wire [GAIN_WIDTH-1:0]          gain_w;
-    wire                           gain_valid_w;
     wire signed [IQ_WIDTH-1:0]     I_agc_out;
     wire signed [IQ_WIDTH-1:0]     Q_agc_out;
     wire                           valid_agc_out;
@@ -96,8 +94,6 @@ module channel_emulator #(
         .valid_in_i     ( valid_tx_i    ),
         .I_in_i         ( I_scaled      ),
         .Q_in_i         ( Q_scaled      ),
-        .gain_o         ( gain_w        ),
-        .gain_valid_o   ( gain_valid_w  ),
         .I_out_o        ( I_agc_out     ),
         .Q_out_o        ( Q_agc_out     ),
         .valid_out_o    ( valid_agc_out )
