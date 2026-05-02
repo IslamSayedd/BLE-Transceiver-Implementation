@@ -4,9 +4,8 @@
 // Sits between BLE_TX_PHY and BLE_RX_PHY.
 // 1. Scales TX I/Q by α to simulate channel attenuation / amplification
 // 2. Sign-extends 12-bit I/Q to 16-bit for agc_top
-// 3. Feeds scaled I/Q into agc_top to get gain word G
-// 4. Applies G to the scaled I/Q and clips back to 12-bit
-// 5. Drives corrected I/Q into BLE_RX_PHY
+// 3. Feeds scaled I/Q into agc_top which applies G and outputs corrected I/Q
+// 4. Drives corrected I/Q into BLE_RX_PHY
 // =============================================================================
 
 module channel_emulator #(
@@ -38,8 +37,8 @@ module channel_emulator #(
     parameter POWER_WIDTH   = 2*AGC_IQ_WIDTH + 1,  // 33
     parameter GAIN_WIDTH    = POWER_WIDTH + 1        // 34
 )(
-    input  wire                      clk,
-    input  wire                      rst_n,
+    input  wire                       clk,
+    input  wire                       rst_n,
 
     // ----- From BLE_TX_PHY -----
     input  wire signed [IQ_WIDTH-1:0] I_tx_i,
@@ -83,11 +82,15 @@ module channel_emulator #(
 
     // =========================================================================
     // Stage 3 — AGC Top
-    // Outputs gain word G (34-bit) based on smoothed power estimate
+    // agc_top now handles gain application and clipping internally.
+    // Outputs corrected I/Q directly.
     // =========================================================================
 
-    wire [GAIN_WIDTH-1:0]  gain_w;
-    wire                   gain_valid_w;
+    wire [GAIN_WIDTH-1:0]          gain_w;
+    wire                           gain_valid_w;
+    wire signed [AGC_IQ_WIDTH-1:0] I_agc_out;
+    wire signed [AGC_IQ_WIDTH-1:0] Q_agc_out;
+    wire                           valid_agc_out;
 
     agc_top #(
         .IQ_WIDTH       ( AGC_IQ_WIDTH  ),
@@ -101,58 +104,26 @@ module channel_emulator #(
         .I_in_i         ( I_ext         ),
         .Q_in_i         ( Q_ext         ),
         .gain_o         ( gain_w        ),
-        .gain_valid_o   ( gain_valid_w  )
+        .gain_valid_o   ( gain_valid_w  ),
+        .I_out_o        ( I_agc_out     ),
+        .Q_out_o        ( Q_agc_out     ),
+        .valid_out_o    ( valid_agc_out )
     );
 
     // =========================================================================
-    // Stage 4 — Apply Gain  (I × G, Q × G)
-    // gain_w is 34-bit.
-    // We treat gain_w as Q8 fixed-point (lower 8 bits = fractional).
-    // Product: 12-bit × 34-bit = 46-bit; we take bits [19:8] → 12-bit result.
-    // Then clip to signed 12-bit range [-2048, +2047].
-    // =========================================================================
-
-    // Full-width products
-    wire signed [IQ_WIDTH + GAIN_WIDTH - 1 : 0] I_product;
-    wire signed [IQ_WIDTH + GAIN_WIDTH - 1 : 0] Q_product;
-
-    assign I_product = $signed(I_scaled) * $signed({1'b0, gain_w});
-    assign Q_product = $signed(Q_scaled) * $signed({1'b0, gain_w});
-
-    // Extract bits [19:8] — equivalent to >> 8 then take 12 bits
-    wire signed [IQ_WIDTH-1:0] I_gained;
-    wire signed [IQ_WIDTH-1:0] Q_gained;
-
-    assign I_gained = I_product[19:8];
-    assign Q_gained = Q_product[19:8];
-
-    // Clip to 12-bit signed [-2048, +2047]
-    localparam signed [IQ_WIDTH-1:0] CLIP_MAX =  { 1'b0, {(IQ_WIDTH-1){1'b1}} };  // +2047
-    localparam signed [IQ_WIDTH-1:0] CLIP_MIN =  { 1'b1, {(IQ_WIDTH-1){1'b0}} };  // -2048
-
-    wire signed [IQ_WIDTH-1:0] I_clipped;
-    wire signed [IQ_WIDTH-1:0] Q_clipped;
-
-    assign I_clipped = (I_gained > CLIP_MAX) ? CLIP_MAX :
-                       (I_gained < CLIP_MIN) ? CLIP_MIN : I_gained;
-
-    assign Q_clipped = (Q_gained > CLIP_MAX) ? CLIP_MAX :
-                       (Q_gained < CLIP_MIN) ? CLIP_MIN : Q_gained;
-
-    // =========================================================================
-    // Stage 5 — Output Register
-    // Gate output valid on gain_valid_w so RX only sees corrected samples
+    // Stage 4 — Output Register
+    // Truncate 16-bit AGC output back to 12-bit for BLE_RX_PHY
     // =========================================================================
 
     always @(posedge clk or negedge rst_n) begin
         if (!rst_n) begin
-            I_rx_o    <= 0;
-            Q_rx_o    <= 0;
+            I_rx_o     <= 0;
+            Q_rx_o     <= 0;
             valid_rx_o <= 0;
         end else begin
-            I_rx_o     <= I_clipped;
-            Q_rx_o     <= Q_clipped;
-            valid_rx_o <= valid_tx_i & gain_valid_w;
+            I_rx_o     <= I_agc_out[IQ_WIDTH-1:0];
+            Q_rx_o     <= Q_agc_out[IQ_WIDTH-1:0];
+            valid_rx_o <= valid_agc_out;
         end
     end
 
