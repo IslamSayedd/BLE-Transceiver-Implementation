@@ -1,32 +1,40 @@
 module agc_top #(
-    parameter IQ_WIDTH      = 16,
+    parameter IQ_WIDTH      = 12,               // TX/RX native width (12-bit)
+    parameter AGC_IQ_WIDTH  = 16,               // Internal AGC width for math precision
     parameter AVG_LOG2      = 4,   
     parameter POWER_TARGET  = 33'd4294967296,   // 2^32
     parameter STEP_SIZE     = 3,
-    parameter POWER_WIDTH   = 2*IQ_WIDTH + 1,   // 33 bits (Power_Estimator output)
-    parameter GAIN_WIDTH    = POWER_WIDTH + 1    // 34 bits (Gain_Control output)
+    parameter POWER_WIDTH   = 2*AGC_IQ_WIDTH + 1,   // 33 bits
+    parameter GAIN_WIDTH    = POWER_WIDTH + 1        // 34 bits
 )(
-    input  wire                       clk,
-    input  wire                       rst_n,
+    input  wire                        clk,
+    input  wire                        rst_n,
 
-    // IQ baseband input
-    input  wire                       valid_in_i,
-    input  wire signed [IQ_WIDTH-1:0] I_in_i,
-    input  wire signed [IQ_WIDTH-1:0] Q_in_i,
+    // IQ baseband input — 12-bit native width
+    input  wire                        valid_in_i,
+    input  wire signed [IQ_WIDTH-1:0]  I_in_i,
+    input  wire signed [IQ_WIDTH-1:0]  Q_in_i,
 
     // Gain output
-    output wire [GAIN_WIDTH-1:0]      gain_o,
-    output wire                       gain_valid_o,
+    output wire [GAIN_WIDTH-1:0]       gain_o,
+    output wire                        gain_valid_o,
 
-    // Corrected IQ output
-    output reg  signed [IQ_WIDTH-1:0] I_out_o,
-    output reg  signed [IQ_WIDTH-1:0] Q_out_o,
-    output reg                        valid_out_o
+    // Corrected IQ output — 12-bit native width
+    output reg  signed [IQ_WIDTH-1:0]  I_out_o,
+    output reg  signed [IQ_WIDTH-1:0]  Q_out_o,
+    output reg                         valid_out_o
 );
 
     /////////////////////////////////////////////
     //////////////Internal signals//////////////
     /////////////////////////////////////////////
+
+    // Sign-extend 12-bit → 16-bit for internal math precision
+    wire signed [AGC_IQ_WIDTH-1:0] I_ext;
+    wire signed [AGC_IQ_WIDTH-1:0] Q_ext;
+
+    assign I_ext = {{(AGC_IQ_WIDTH-IQ_WIDTH){I_in_i[IQ_WIDTH-1]}}, I_in_i};
+    assign Q_ext = {{(AGC_IQ_WIDTH-IQ_WIDTH){Q_in_i[IQ_WIDTH-1]}}, Q_in_i};
 
     wire [POWER_WIDTH-1:0]  raw_power_w;
     wire                    raw_power_valid_w;
@@ -35,11 +43,13 @@ module agc_top #(
     wire                    avg_power_valid_w;
 
     // Gain application internals
+    // Product: 12-bit × 34-bit = 46-bit
     wire signed [IQ_WIDTH + GAIN_WIDTH - 1 : 0] I_product;
     wire signed [IQ_WIDTH + GAIN_WIDTH - 1 : 0] Q_product;
 
-    localparam signed [IQ_WIDTH-1:0] CLIP_MAX = { 1'b0, {(IQ_WIDTH-1){1'b1}} };
-    localparam signed [IQ_WIDTH-1:0] CLIP_MIN = { 1'b1, {(IQ_WIDTH-1){1'b0}} };
+    // Clip constants — 12-bit signed range
+    localparam signed [IQ_WIDTH-1:0] CLIP_MAX = { 1'b0, {(IQ_WIDTH-1){1'b1}} };  // +2047
+    localparam signed [IQ_WIDTH-1:0] CLIP_MIN = { 1'b1, {(IQ_WIDTH-1){1'b0}} };  // -2048
 
     wire signed [IQ_WIDTH-1:0] I_gained;
     wire signed [IQ_WIDTH-1:0] Q_gained;
@@ -51,13 +61,13 @@ module agc_top #(
     ///////////////////////////////////////////
     
     Power_Estimator #(
-        .N          ( IQ_WIDTH      )
+        .N          ( AGC_IQ_WIDTH  )       // 16-bit for math precision
     ) u_power_estimator (
         .clk        ( clk               ),
         .rst_n      ( rst_n             ),
         .valid_in   ( valid_in_i        ),
-        .I_in       ( I_in_i            ),
-        .Q_in       ( Q_in_i            ),
+        .I_in       ( I_ext             ),  // 16-bit sign-extended
+        .Q_in       ( Q_ext             ),  // 16-bit sign-extended
         .power_out  ( raw_power_w       ),
         .valid_out  ( raw_power_valid_w )
     );
@@ -71,7 +81,7 @@ module agc_top #(
         .N_LOG2     ( AVG_LOG2      )
     ) u_avg_filter (
         .clk        ( clk               ),
-        .rst        ( rst_n             ),   // active-low reset
+        .rst        ( rst_n             ),
         .valid_in_i ( raw_power_valid_w ),
         .data_in_i  ( raw_power_w       ),
         .avg_out_o  ( avg_power_w       ),
@@ -100,21 +110,22 @@ module agc_top #(
     ////////////// Apply Gain //////////////////
     ////////////////////////////////////////////
 
-    // Multiply I/Q by gain word G (Q8 format → divide by 256)
+    // Multiply 12-bit I/Q by gain word G (Q8 format)
+    // Product: 12-bit × 34-bit = 46-bit
     assign I_product = $signed(I_in_i) * $signed({1'b0, gain_o});
     assign Q_product = $signed(Q_in_i) * $signed({1'b0, gain_o});
 
-    // Extract bits [19:8] — equivalent to >> 8, keep IQ_WIDTH bits
+    // Extract bits [19:8] — >> 8 then take 12 bits (Q8 fixed-point)
     assign I_gained = I_product[19:8];
     assign Q_gained = Q_product[19:8];
 
-    // Clip to IQ_WIDTH signed range
+    // Clip to 12-bit signed range [-2048, +2047]
     assign I_clipped = ($signed(I_gained) > $signed(CLIP_MAX)) ? CLIP_MAX :
                        ($signed(I_gained) < $signed(CLIP_MIN)) ? CLIP_MIN : I_gained;
     assign Q_clipped = ($signed(Q_gained) > $signed(CLIP_MAX)) ? CLIP_MAX :
                        ($signed(Q_gained) < $signed(CLIP_MIN)) ? CLIP_MIN : Q_gained;
 
-    // Output register
+    // Output register — 12-bit corrected I/Q to BLE_RX_PHY
     always @(posedge clk or negedge rst_n) begin
         if (!rst_n) begin
             I_out_o     <= 0;

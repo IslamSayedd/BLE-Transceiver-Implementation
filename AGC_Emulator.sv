@@ -3,9 +3,11 @@
 // =============================================================================
 // Sits between BLE_TX_PHY and BLE_RX_PHY.
 // 1. Scales TX I/Q by α to simulate channel attenuation / amplification
-// 2. Sign-extends 12-bit I/Q to 16-bit for agc_top
-// 3. Feeds scaled I/Q into agc_top which applies G and outputs corrected I/Q
-// 4. Drives corrected I/Q into BLE_RX_PHY
+// 2. Feeds scaled I/Q into agc_top which handles:
+//      - Sign extension 12-bit → 16-bit internally for math precision
+//      - Power estimation, averaging, gain control
+//      - Gain application and clipping back to 12-bit
+// 3. Drives corrected 12-bit I/Q into BLE_RX_PHY
 // =============================================================================
 
 module channel_emulator #(
@@ -20,7 +22,7 @@ module channel_emulator #(
     // α = 256  → gain 1.0  (no change)
     // α = 26   → gain 0.1  (weak signal)
     // α = 128  → gain 0.5  (medium)
-    // α = 512  → gain 2.0  (strong / clipping risk)
+    // α = 490  → gain 1.91 (strong / maximum recoverable)
     // -------------------------------------------------------
     parameter ALPHA_Q8      = 8'd26,        // default: weak signal (α ≈ 0.1)
 
@@ -71,29 +73,20 @@ module channel_emulator #(
     assign Q_scaled = Q_scaled_full >>> 8;
 
     // =========================================================================
-    // Stage 2 — Sign-extend 12-bit → 16-bit for agc_top
-    // =========================================================================
-
-    wire signed [AGC_IQ_WIDTH-1:0] I_ext;
-    wire signed [AGC_IQ_WIDTH-1:0] Q_ext;
-
-    assign I_ext = {{(AGC_IQ_WIDTH-IQ_WIDTH){I_scaled[IQ_WIDTH-1]}}, I_scaled};
-    assign Q_ext = {{(AGC_IQ_WIDTH-IQ_WIDTH){Q_scaled[IQ_WIDTH-1]}}, Q_scaled};
-
-    // =========================================================================
-    // Stage 3 — AGC Top
-    // agc_top now handles gain application and clipping internally.
-    // Outputs corrected I/Q directly.
+    // Stage 2 — AGC Top
+    // agc_top sign-extends 12-bit → 16-bit internally for math precision.
+    // Applies gain G, clips back to 12-bit, outputs corrected I/Q directly.
     // =========================================================================
 
     wire [GAIN_WIDTH-1:0]          gain_w;
     wire                           gain_valid_w;
-    wire signed [AGC_IQ_WIDTH-1:0] I_agc_out;
-    wire signed [AGC_IQ_WIDTH-1:0] Q_agc_out;
+    wire signed [IQ_WIDTH-1:0]     I_agc_out;
+    wire signed [IQ_WIDTH-1:0]     Q_agc_out;
     wire                           valid_agc_out;
 
     agc_top #(
-        .IQ_WIDTH       ( AGC_IQ_WIDTH  ),
+        .IQ_WIDTH       ( IQ_WIDTH      ),
+        .AGC_IQ_WIDTH   ( AGC_IQ_WIDTH  ),
         .AVG_LOG2       ( AVG_LOG2      ),
         .POWER_TARGET   ( POWER_TARGET  ),
         .STEP_SIZE      ( STEP_SIZE     )
@@ -101,8 +94,8 @@ module channel_emulator #(
         .clk            ( clk           ),
         .rst_n          ( rst_n         ),
         .valid_in_i     ( valid_tx_i    ),
-        .I_in_i         ( I_ext         ),
-        .Q_in_i         ( Q_ext         ),
+        .I_in_i         ( I_scaled      ),
+        .Q_in_i         ( Q_scaled      ),
         .gain_o         ( gain_w        ),
         .gain_valid_o   ( gain_valid_w  ),
         .I_out_o        ( I_agc_out     ),
@@ -111,8 +104,8 @@ module channel_emulator #(
     );
 
     // =========================================================================
-    // Stage 4 — Output Register
-    // Truncate 16-bit AGC output back to 12-bit for BLE_RX_PHY
+    // Stage 3 — Output Register
+    // agc_top outputs corrected 12-bit I/Q — pass directly to BLE_RX_PHY
     // =========================================================================
 
     always @(posedge clk or negedge rst_n) begin
@@ -121,8 +114,8 @@ module channel_emulator #(
             Q_rx_o     <= 0;
             valid_rx_o <= 0;
         end else begin
-            I_rx_o     <= I_agc_out[IQ_WIDTH-1:0];
-            Q_rx_o     <= Q_agc_out[IQ_WIDTH-1:0];
+            I_rx_o     <= I_agc_out;
+            Q_rx_o     <= Q_agc_out;
             valid_rx_o <= valid_agc_out;
         end
     end
