@@ -4,7 +4,7 @@ import uvm_pkg::*;
 
 class PHY_config extends uvm_object;
 `uvm_object_utils(PHY_config)
-virtual PHY_if PHY_vif;
+virtual BLE_PHY_if BLE_PHY_vif;
     function new(string name = "PHY_config");
         super.new(name);
     endfunction 

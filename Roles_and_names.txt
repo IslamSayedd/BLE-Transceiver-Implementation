@@ -5,7 +5,9 @@
 	PHY_sqr.sv					PHY_coverage.sv
 	PHY_driver.sv					PHY_monitor.sv
 	PHY_seq_item.sv					PHY_test.sv
+							PHY_config.sv
 	PHY_sequence.sv					PHY_sva.sv
+							BLE_PHY_if.sv//Interface file
 				       PHY_sb.sv
 	
 /////////////////////////////////////////////////////////////////////////
@@ -30,3 +32,6 @@
 	uvm_analysis_export #(PHY_seq_item) cov_export;
     	uvm_tlm_analysis_fifo #(PHY_seq_item) cov_fifo;
 
+/////////////////////////////////////////////////////////////////////////
+	Virtual Interface Name
+	BLE_PHY_vif
