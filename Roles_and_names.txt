@@ -1,3 +1,11 @@
+Notes
+
+	1. I edited the DUT module, the one we will be using for verification 	  	(BLE_PHY_verif.sv). The other one will be used for ASIC.
+
+	2. 
+
+
+/////////////////////////////////////////////////////////////////////////
 Blocks
 
 	Abdelrahman
