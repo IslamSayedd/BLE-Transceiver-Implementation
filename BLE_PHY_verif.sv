@@ -33,7 +33,7 @@ module BLE_PHY_verif (BLE_PHY_if.DUT PHY_if);
     parameter RSSI_THRESHOLD    = PHY_if.RSSI_THRESHOLD;
 
     //==========================================================================
-    // Local Logic Signals — Inputs
+    // Logic Signals — Inputs
     //==========================================================================
     logic                            clk;
     logic                            rst_n;
@@ -43,7 +43,7 @@ module BLE_PHY_verif (BLE_PHY_if.DUT PHY_if);
     logic [ADDRESS_WIDTH-1:0]        tap_address_i;
 
     //==========================================================================
-    // Local Logic Signals — Outputs
+    // Logic Signals — Outputs
     //==========================================================================
     logic                            rx_bit_o;
     logic                            rx_bit_valid_o;
