@@ -17,7 +17,16 @@ module BLE_PHY #(
     parameter AGC_IQ_WIDTH         = 16,
     parameter AGC_AVG_LOG2         = 4,
     parameter AGC_POWER_TARGET     = 33'd4294967296,
-    parameter AGC_STEP_SIZE        = 3
+    parameter AGC_STEP_SIZE        = 3,
+
+    // RSSI parameters
+    parameter RSSI_N               = 16,
+    parameter RSSI_DATA_WIDTH      = 32,
+    parameter RSSI_N_LOG2          = 4,
+    parameter RSSI_WIDTH           = 32,
+    parameter RSSI_NO_BITS         = 5,
+    parameter RSSI_FRAC_BITS       = 8,
+    parameter RSSI_THRESHOLD       = 16'd1843
 ) (
     //==========================================================================
     // TX Signals
@@ -30,22 +39,28 @@ module BLE_PHY #(
     input  wire [ADDRESS_WIDTH-1:0]        tap_address_i,
 
     //==========================================================================
+    // RSSI Outputs
+    //==========================================================================
+    output wire [RSSI_N-1:0]               rssi_out_o,
+    output wire                            rssi_valid_o,
+    output wire                            signal_flag_o,
+
+    //==========================================================================
     // RX Signals
     //==========================================================================
     output wire                            rx_bit_o,
     output wire                            rx_bit_valid_o
 );
 
-
     //==========================================================================
-    // Internal wires — Tx outputs — AGC inputs
+    // Internal wires — TX outputs — AGC inputs
     //==========================================================================
     wire [VCO_OUT_SIZE-1:0]         Quadrature_Phase_w;
     wire [VCO_OUT_SIZE-1:0]         In_Phase_w;
     wire                            Phase_Valid_w;
 
     //==========================================================================
-    // Internal wires — AGC outputs
+    // Internal wires — AGC outputs — RX inputs & RSSI inputs
     //==========================================================================
     wire signed [VCO_OUT_SIZE-1:0]  agc_I_w;
     wire signed [VCO_OUT_SIZE-1:0]  agc_Q_w;
@@ -94,6 +109,28 @@ module BLE_PHY #(
         .I_out_o        (agc_I_w),
         .Q_out_o        (agc_Q_w),
         .valid_out_o    (agc_valid_w)
+    );
+
+    //==========================================================================
+    // RSSI Instantiation
+    //==========================================================================
+    RSSI_TOP #(
+        .N              (RSSI_N),
+        .DATA_WIDTH     (RSSI_DATA_WIDTH),
+        .N_LOG2         (RSSI_N_LOG2),
+        .WIDTH          (RSSI_WIDTH),
+        .NO_BITS        (RSSI_NO_BITS),
+        .FRAC_BITS      (RSSI_FRAC_BITS),
+        .RSSI_THRESHOLD (RSSI_THRESHOLD)
+    ) u_RSSI (
+        .clk            (clk),
+        .rst_n          (rst_n),
+        .valid_i        (agc_valid_w),
+        .I_in           (agc_I_w),
+        .Q_in           (agc_Q_w),
+        .rssi_out_o     (rssi_out_o),
+        .rssi_valid_o   (rssi_valid_o),
+        .signal_flag_o  (signal_flag_o)
     );
 
     //==========================================================================
