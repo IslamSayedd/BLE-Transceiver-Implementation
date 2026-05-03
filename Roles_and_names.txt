@@ -21,6 +21,7 @@ Blocks
 	PHY_sva.sv
 	BLE_PHY_if.sv	//Interface file
 	PHY_sb.sv	//Shared 
+	BLE_PHY_top.sv	//Top for uvm
 
 	
 /////////////////////////////////////////////////////////////////////////
