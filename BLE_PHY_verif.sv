@@ -1,7 +1,7 @@
 module BLE_PHY_verif (BLE_PHY_if.DUT PHY_if);
 
     //==========================================================================
-    // Extract Parameters from Interface
+    // Parameters from Interface
     //==========================================================================
     parameter NRZ_DATA_WIDTH    = PHY_if.NRZ_DATA_WIDTH;
     parameter SAMPLE_PER_SYMBOL = PHY_if.SAMPLE_PER_SYMBOL;
