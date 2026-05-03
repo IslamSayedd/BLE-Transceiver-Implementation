@@ -15,7 +15,7 @@ Blocks
 
 	PHY_env.sv (Done)
 	PHY_coverage.sv (Done)
-	PHY_monitor.sv
+	PHY_monitor.sv	(Done)
 	PHY_test.sv
 	PHY_config.sv (Done)
 	PHY_sva.sv
