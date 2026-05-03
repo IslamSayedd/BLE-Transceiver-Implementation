@@ -76,6 +76,39 @@ class PHY_coverage extends uvm_component;
             illegal_bins cross_mismatch = default;
         }
 
+        rssi_valid_o_cp: coverpoint seq_item_cov.rssi_valid_o
+        {
+            bins rssi_valid_low  = {1'b0};
+            bins rssi_valid_high = {1'b1};
+        }
+
+        signal_flag_o_cp: coverpoint seq_item_cov.signal_flag_o
+        {
+            bins signal_flag_o_low   = {1'b0};
+            bins signal_flag_o_high  = {1'b1};
+        }
+
+        rssi_out_o_cp: coverpoint seq_item_cov.rssi_out_o
+        {
+            bins rssi_very_weak  = {[16'd0    : 16'd1228]};   // < -80 dBm equivalent
+            bins rssi_weak       = {[16'd1229  : 16'd1843]};  // -80 to -70 dBm (below threshold)
+            bins rssi_medium     = {[16'd1844  : 16'd2457]};  // -70 to -60 dBm (above threshold)
+            bins rssi_strong     = {[16'd2458  : 16'd3072]};  // -60 to -50 dBm
+            bins rssi_very_strong= {[16'd3073  : 16'd65535]}; // > -50 dBm
+        }
+
+        // Cross: rssi output zone with signal_flag — verify threshold logic is correct
+        rssi_out_x_flag_cp: cross rssi_out_o_cp, signal_flag_o_cp
+        {
+            // Below threshold zones must have flag = 0
+            illegal_bins weak_zone_strong_flag  = binsof(rssi_out_o_cp.rssi_very_weak)      && binsof(signal_flag_o_cp.signal_flag_o_high);
+            illegal_bins below_thresh_strong    = binsof(rssi_out_o_cp.rssi_weak)           && binsof(signal_flag_o_cp.signal_flag_o_high);
+            // Above threshold zones must have flag = 1
+            illegal_bins above_thresh_weak      = binsof(rssi_out_o_cp.rssi_medium)         && binsof(signal_flag_o_cp.signal_flag_o_low);
+            illegal_bins strong_zone_weak_flag  = binsof(rssi_out_o_cp.rssi_strong)         && binsof(signal_flag_o_cp.signal_flag_o_low);
+            illegal_bins vstrong_zone_weak_flag = binsof(rssi_out_o_cp.rssi_very_strong)    && binsof(signal_flag_o_cp.signal_flag_o_low);
+        }
+
         rx_bit_o_cp: coverpoint seq_item_cov.rx_bit_o 
         {
             bins rising  = (1'b0 => 1'b1);
