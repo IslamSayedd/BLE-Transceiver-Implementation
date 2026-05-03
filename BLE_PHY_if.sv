@@ -38,10 +38,6 @@ interface BLE_PHY_if(clk);
     logic [TAP_WIDTH-1:0]            tap_value_i;
     logic [ADDRESS_WIDTH-1:0]        tap_address_i;
 
-    logic [VCO_OUT_SIZE-1:0]         Quadrature_Phase_o;
-    logic [VCO_OUT_SIZE-1:0]         In_Phase_o;
-    logic                            Phase_Valid_o;
-
     
     // RX Signals
     logic                            rx_bit_o;
@@ -51,10 +47,8 @@ interface BLE_PHY_if(clk);
     ///////////////////////////////////////////////////////
     ///////////////Defining Modports///////////////////////
     ///////////////////////////////////////////////////////
-    modport DUT ( input clk , rst_n, phy_bit_i, bit_valid_i, tap_value_i, tap_address_i, 
-    output Quadrature_Phase_o , In_Phase_o , Phase_Valid_o , rx_bit_o , rx_bit_valid_o );
+    modport DUT ( input clk , rst_n, phy_bit_i, bit_valid_i, tap_value_i, tap_address_i, output rx_bit_o , rx_bit_valid_o );
 
-    modport sva ( input clk , rst_n, phy_bit_i, bit_valid_i, tap_value_i, tap_address_i, 
-    Quadrature_Phase_o , In_Phase_o , Phase_Valid_o , rx_bit_o , rx_bit_valid_o );
+    modport sva ( input clk , rst_n, phy_bit_i, bit_valid_i, tap_value_i, tap_address_i, rx_bit_o , rx_bit_valid_o );
     
 endinterface
