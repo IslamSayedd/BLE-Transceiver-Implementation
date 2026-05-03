@@ -13,15 +13,15 @@ Blocks
 	
 	Shawky
 
-	PHY_env.sv
-	PHY_coverage.sv
+	PHY_env.sv (Done)
+	PHY_coverage.sv (Done)
 	PHY_monitor.sv
 	PHY_test.sv
-	PHY_config.sv
+	PHY_config.sv (Done)
 	PHY_sva.sv
-	BLE_PHY_if.sv	//Interface file
+	BLE_PHY_if.sv (Done)	//Interface file
 	PHY_sb.sv	//Shared 
-	BLE_PHY_top.sv	//Top for uvm
+	BLE_PHY_top.sv (Done)	//Top for uvm
 
 	
 /////////////////////////////////////////////////////////////////////////
