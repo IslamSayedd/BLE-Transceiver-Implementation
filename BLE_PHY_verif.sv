@@ -52,7 +52,7 @@ module BLE_PHY_verif (BLE_PHY_if.DUT PHY_if);
     logic                            signal_flag_o;
 
     //==========================================================================
-    // Interface Assignments — Inputs (interface → local)
+    // Interface Assignments — Inputs 
     //==========================================================================
     assign clk           = PHY_if.clk;
     assign rst_n         = PHY_if.rst_n;
@@ -62,7 +62,7 @@ module BLE_PHY_verif (BLE_PHY_if.DUT PHY_if);
     assign tap_address_i = PHY_if.tap_address_i;
 
     //==========================================================================
-    // Interface Assignments — Outputs (local → interface)
+    // Interface Assignments — Outputs 
     //==========================================================================
     assign PHY_if.rx_bit_o       = rx_bit_o;
     assign PHY_if.rx_bit_valid_o = rx_bit_valid_o;
@@ -71,14 +71,14 @@ module BLE_PHY_verif (BLE_PHY_if.DUT PHY_if);
     assign PHY_if.signal_flag_o  = signal_flag_o;
 
     //==========================================================================
-    // Internal wires — TX outputs → AGC inputs
+    // Internal wires — TX outputs — AGC inputs
     //==========================================================================
     logic [VCO_OUT_SIZE-1:0]         Quadrature_Phase_w;
     logic [VCO_OUT_SIZE-1:0]         In_Phase_w;
     logic                            Phase_Valid_w;
 
     //==========================================================================
-    // Internal wires — AGC outputs → RX inputs & RSSI inputs
+    // Internal wires — AGC outputs — RX inputs & RSSI inputs
     //==========================================================================
     logic signed [VCO_OUT_SIZE-1:0]  agc_I_w;
     logic signed [VCO_OUT_SIZE-1:0]  agc_Q_w;
