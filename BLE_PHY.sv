@@ -28,28 +28,30 @@ module BLE_PHY #(
     parameter RSSI_FRAC_BITS       = 8,
     parameter RSSI_THRESHOLD       = 16'd1843
 ) (
+    input  wire                            clk,
+    input  wire                            rst_n,
+
     //==========================================================================
     // TX Signals
     //==========================================================================
-    input  wire                            clk,
-    input  wire                            rst_n,
     input  wire                            phy_bit_i,
     input  wire                            bit_valid_i,
+
     input  wire [TAP_WIDTH-1:0]            tap_value_i,
     input  wire [ADDRESS_WIDTH-1:0]        tap_address_i,
 
-    //==========================================================================
-    // RSSI Outputs
-    //==========================================================================
-    output wire [RSSI_N-1:0]               rssi_out_o,
-    output wire                            rssi_valid_o,
-    output wire                            signal_flag_o,
-
+    output wire [VCO_OUT_SIZE-1:0]         Quadrature_Phase_AGC_o,
+    output wire [VCO_OUT_SIZE-1:0]         In_Phase_AGC_o,
+    
     //==========================================================================
     // RX Signals
     //==========================================================================
-    output wire                            rx_bit_o,
-    output wire                            rx_bit_valid_o
+    input wire [VCO_OUT_SIZE-1:0]         Quadrature_Phase_RX_i,
+    input wire [VCO_OUT_SIZE-1:0]         In_Phase_RX_i,
+    input wire                            RX_Valid_i,
+
+    output wire                           rx_bit_o,
+    output wire                           rx_bit_valid_o
 );
 
     //==========================================================================
@@ -60,11 +62,18 @@ module BLE_PHY #(
     wire                            Phase_Valid_w;
 
     //==========================================================================
-    // Internal wires — AGC outputs — RX inputs & RSSI inputs
+    // Internal wires — AGC 
     //==========================================================================
-    wire signed [VCO_OUT_SIZE-1:0]  agc_I_w;
-    wire signed [VCO_OUT_SIZE-1:0]  agc_Q_w;
-    wire                            agc_valid_w;
+    wire                            agc_valid_w
+
+
+    //==========================================================================
+    // Internal wires — RSSI Outputs
+    //==========================================================================
+    wire [RSSI_N-1:0]               rssi_out_o;
+    wire                            rssi_valid_o;
+    wire                            signal_flag_o;
+
 
     //==========================================================================
     // TX Instantiation
@@ -106,8 +115,8 @@ module BLE_PHY #(
         .valid_in_i     (Phase_Valid_w),
         .I_in_i         (In_Phase_w),
         .Q_in_i         (Quadrature_Phase_w),
-        .I_out_o        (agc_I_w),
-        .Q_out_o        (agc_Q_w),
+        .I_out_o        (In_Phase_AGC_o),
+        .Q_out_o        (Quadrature_Phase_AGC_o),
         .valid_out_o    (agc_valid_w)
     );
 
@@ -125,9 +134,9 @@ module BLE_PHY #(
     ) u_RSSI (
         .clk            (clk),
         .rst_n          (rst_n),
-        .valid_i        (agc_valid_w),
-        .I_in           (agc_I_w),
-        .Q_in           (agc_Q_w),
+        .valid_i        (RX_Valid_i),
+        .I_in           (In_Phase_RX_i),
+        .Q_in           (Quadrature_Phase_RX_i),
         .rssi_out_o     (rssi_out_o),
         .rssi_valid_o   (rssi_valid_o),
         .signal_flag_o  (signal_flag_o)
@@ -143,9 +152,9 @@ module BLE_PHY #(
     ) u_RX (
         .clk                (clk),
         .rst_n              (rst_n),
-        .in_phase_i_i       (agc_I_w),
-        .quadrature_q_i     (agc_Q_w),
-        .iq_valid_i         (agc_valid_w),
+        .in_phase_i_i       (In_Phase_RX_i),
+        .quadrature_q_i     (Quadrature_Phase_RX_i),
+        .iq_valid_i         (RX_Valid_i & signal_flag_o),
         .rx_bit_o           (rx_bit_o),
         .rx_bit_valid_o     (rx_bit_valid_o)
     );
