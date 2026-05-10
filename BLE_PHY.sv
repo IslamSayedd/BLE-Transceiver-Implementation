@@ -51,7 +51,13 @@ module BLE_PHY #(
     input wire                            RX_Valid_i,
 
     output wire                           rx_bit_o,
-    output wire                           rx_bit_valid_o
+    output wire                           rx_bit_valid_o,
+
+
+    //==========================================================================
+    // RSSI Signals
+    //==========================================================================
+    output wire                           signal_flag_o
 );
 
     //==========================================================================
@@ -72,7 +78,6 @@ module BLE_PHY #(
     //==========================================================================
     wire [RSSI_N-1:0]               rssi_out_o;
     wire                            rssi_valid_o;
-    wire                            signal_flag_o;
 
 
     //==========================================================================
@@ -154,7 +159,7 @@ module BLE_PHY #(
         .rst_n              (rst_n),
         .in_phase_i_i       (In_Phase_RX_i),
         .quadrature_q_i     (Quadrature_Phase_RX_i),
-        .iq_valid_i         (RX_Valid_i & signal_flag_o),
+        .iq_valid_i         (RX_Valid_i),
         .rx_bit_o           (rx_bit_o),
         .rx_bit_valid_o     (rx_bit_valid_o)
     );
