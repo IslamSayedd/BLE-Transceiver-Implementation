@@ -13,10 +13,10 @@ module NRZ #(
 );
 
 integer j;
-integer count_loop='b0; //for output
+integer count_loop; //for output
 reg Done;
 reg flag_done;
-integer counter = 'b0;
+integer counter;
 reg [ 1 : 0] NRZ_reg [DATA_WIDTH - 1 : 0];
 
 //Input
@@ -24,8 +24,6 @@ always @ (posedge clk or negedge rst_n)
   begin
     if (!rst_n) 
       begin
-        NRZ_o <= 'b0;
-        NRZ_valid_o <= 'b0;
         counter <= 'b0;
       end 
     else 
@@ -58,7 +56,7 @@ always@(posedge clk or negedge rst_n)
       begin
         NRZ_o <= 'b0;
         NRZ_valid_o <= 'b0;
-        counter <= 'b0;
+        count_loop <='b0;
       end 
     else 
       begin
@@ -76,27 +74,10 @@ always@(posedge clk or negedge rst_n)
       end       
   end
 
-//NRZ logic
-/*always@(*) begin
-	if (In_valid) begin
-        for(i = 0; i < DATA_WIDTH ; i++) begin
-        	if(store_in[i])
-        		begin
-        			NRZ_reg[i] <= 'b1;
-        			
-        		end
-        	else begin
-        		NRZ_reg[i] <= -'sd1;
-        	end
-        end
-        Done <= 'b1;
-    end
-    else begin
-        Done <= 'b0;
-        
-    end
-end*/
-//assign In_valid = (counter == DATA_WIDTH )? 'b1: 'b0 ; // I already received the full frame
 assign  flag_done = ((Done || count_loop != 'b0) && (count_loop != DATA_WIDTH ))? 'b1 :'b0 ; // to ensure that the flag is 1 first when the done is 1 and then until i send all the data
 
 endmodule 
+
+
+
+

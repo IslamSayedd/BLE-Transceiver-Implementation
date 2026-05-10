@@ -2,7 +2,7 @@ module log10_32bits #(
     parameter WIDTH = 32,
     parameter NO_BITS = 5,
     parameter FRAC_BITS = 8,           // fixed-point precision
-    parameter string LUT_FILE = "log2_lut.mem"
+    parameter LUT_FILE = "log2_lut.mem"
 )(
     input  wire                     clk,
     input  wire                     rst,
@@ -105,9 +105,7 @@ module log10_32bits #(
     // LUT for log2(1+f)
     reg [15:0] log2_lut [0:255];
 
-    initial begin
-        $readmemh(LUT_FILE, log2_lut);
-    end
+
 
     wire [15:0] frac_value;
     assign frac_value = log2_lut[frac_index];

@@ -24,8 +24,8 @@ module agc_top #(
     /////////////////////////////////////////////
     //////////////Internal signals//////////////
     /////////////////////////////////////////////
-    wire [GAIN_WIDTH-1:0]       gain_o,
-    wire                        gain_valid_o,
+    wire [GAIN_WIDTH-1:0]       gain_o;
+    wire                        gain_valid_o;
 
     // Sign-extend 12-bit → 16-bit for internal math precision
     wire signed [AGC_IQ_WIDTH-1:0] I_ext;

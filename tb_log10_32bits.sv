@@ -49,6 +49,9 @@ module tb_log10_32bits;
         valid_in = 0;
         avg_power = 0;
 
+        // Load LUT from file into DUT memory
+        $readmemh("log2_lut.mem", dut.log2_lut);
+
         // Reset
         #20;
         rst = 1;
