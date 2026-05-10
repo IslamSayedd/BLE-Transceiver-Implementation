@@ -12,6 +12,9 @@ class PHY_coverage extends uvm_component;
 
     covergroup cp;
 
+        //======================================================================
+        // TX Input Coverpoints
+        //======================================================================
         phy_bit_i_cp: coverpoint seq_item_cov.phy_bit_i 
         {
             bins phy_bit_low  = {1'b0};
@@ -26,10 +29,10 @@ class PHY_coverage extends uvm_component;
 
         valid_x_data_cp: cross bit_valid_i_cp, phy_bit_i_cp 
         {
-            bins idle_zero    = binsof(bit_valid_i_cp.bit_valid_low)     &&  binsof(phy_bit_i_cp.phy_bit_low);
-            bins idle_one     = binsof(bit_valid_i_cp.bit_valid_low)     &&  binsof(phy_bit_i_cp.phy_bit_high);
-            bins active_zero  = binsof(bit_valid_i_cp.bit_valid_high)    &&  binsof(phy_bit_i_cp.phy_bit_low);      
-            bins active_one   = binsof(bit_valid_i_cp.bit_valid_high)    &&  binsof(phy_bit_i_cp.phy_bit_high);    
+            bins idle_zero    = binsof(bit_valid_i_cp.bit_valid_low)  && binsof(phy_bit_i_cp.phy_bit_low);
+            bins idle_one     = binsof(bit_valid_i_cp.bit_valid_low)  && binsof(phy_bit_i_cp.phy_bit_high);
+            bins active_zero  = binsof(bit_valid_i_cp.bit_valid_high) && binsof(phy_bit_i_cp.phy_bit_low);      
+            bins active_one   = binsof(bit_valid_i_cp.bit_valid_high) && binsof(phy_bit_i_cp.phy_bit_high);    
         }
 
         tap_address_i_cp: coverpoint seq_item_cov.tap_address_i 
@@ -42,26 +45,25 @@ class PHY_coverage extends uvm_component;
             bins addr_5_k_neg3   = {4'd5};
             bins addr_6_k_neg2   = {4'd6};
             bins addr_7_k_neg1   = {4'd7};
-            bins addr_8_k_centre = {4'd8};   // peak tap (k=0, value=1505)
+            bins addr_8_k_centre = {4'd8};
         }
 
         tap_value_i_cp: coverpoint seq_item_cov.tap_value_i 
         {
-            bins val_tail      = {16'd1};     // k = ±8
-            bins val_neartail  = {16'd6};     // k = ±7
-            bins val_low       = {16'd27};    // k = ±6
-            bins val_lowmid    = {16'd93};    // k = ±5
-            bins val_mid       = {16'd254};   // k = ±4
-            bins val_midhigh   = {16'd553};   // k = ±3
-            bins val_high      = {16'd965};   // k = ±2
-            bins val_nearpeak  = {16'd1347};  // k = ±1
-            bins val_peak      = {16'd1505};  // k =  0  ← Gaussian centre
+            bins val_tail      = {16'd1};
+            bins val_neartail  = {16'd6};
+            bins val_low       = {16'd27};
+            bins val_lowmid    = {16'd93};
+            bins val_mid       = {16'd254};
+            bins val_midhigh   = {16'd553};
+            bins val_high      = {16'd965};
+            bins val_nearpeak  = {16'd1347};
+            bins val_peak      = {16'd1505};
             illegal_bins val_illegal = default;
         }
 
         tap_addr_x_val_cp: cross tap_address_i_cp, tap_value_i_cp 
         {
-            // ---- legal (address, value) pairs ----
             bins cross_addr0_val1    = binsof(tap_address_i_cp.addr_0_k_neg8)   && binsof(tap_value_i_cp.val_tail);
             bins cross_addr1_val6    = binsof(tap_address_i_cp.addr_1_k_neg7)   && binsof(tap_value_i_cp.val_neartail);
             bins cross_addr2_val27   = binsof(tap_address_i_cp.addr_2_k_neg6)   && binsof(tap_value_i_cp.val_low);
@@ -71,44 +73,61 @@ class PHY_coverage extends uvm_component;
             bins cross_addr6_val965  = binsof(tap_address_i_cp.addr_6_k_neg2)   && binsof(tap_value_i_cp.val_high);
             bins cross_addr7_val1347 = binsof(tap_address_i_cp.addr_7_k_neg1)   && binsof(tap_value_i_cp.val_nearpeak);
             bins cross_addr8_val1505 = binsof(tap_address_i_cp.addr_8_k_centre) && binsof(tap_value_i_cp.val_peak);
-
-            // ---- everything else is a mismatch — flag it immediately ----
             illegal_bins cross_mismatch = default;
         }
 
-        rssi_valid_o_cp: coverpoint seq_item_cov.rssi_valid_o
+        //======================================================================
+        // AGC Output Coverpoints (TX path)
+        //======================================================================
+        In_Phase_AGC_o_cp: coverpoint seq_item_cov.In_Phase_AGC_o
         {
-            bins rssi_valid_low  = {1'b0};
-            bins rssi_valid_high = {1'b1};
+            bins negative  = {[$:12'sh800]};           // full negative range
+            bins zero      = {12'sh000};
+            bins positive  = {12'sh001[$:12'sh7FF]};   // full positive range
         }
 
-        signal_flag_o_cp: coverpoint seq_item_cov.signal_flag_o
+        Quadrature_Phase_AGC_o_cp: coverpoint seq_item_cov.Quadrature_Phase_AGC_o
         {
-            bins signal_flag_o_low   = {1'b0};
-            bins signal_flag_o_high  = {1'b1};
+            bins negative  = {[$:12'sh800]};
+            bins zero      = {12'sh000};
+            bins positive  = {12'sh001[$:12'sh7FF]};
         }
 
-        rssi_out_o_cp: coverpoint seq_item_cov.rssi_out_o
+        //======================================================================
+        // RX Input Coverpoints
+        //======================================================================
+        RX_Valid_i_cp: coverpoint seq_item_cov.RX_Valid_i
         {
-            bins rssi_very_weak  = {[16'd0    : 16'd1228]};   // < -80 dBm equivalent
-            bins rssi_weak       = {[16'd1229  : 16'd1843]};  // -80 to -70 dBm (below threshold)
-            bins rssi_medium     = {[16'd1844  : 16'd2457]};  // -70 to -60 dBm (above threshold)
-            bins rssi_strong     = {[16'd2458  : 16'd3072]};  // -60 to -50 dBm
-            bins rssi_very_strong= {[16'd3073  : 16'd65535]}; // > -50 dBm
+            bins rx_valid_low  = {1'b0};
+            bins rx_valid_high = {1'b1};
         }
 
-        // Cross: rssi output zone with signal_flag — verify threshold logic is correct
-        rssi_out_x_flag_cp: cross rssi_out_o_cp, signal_flag_o_cp
+        In_Phase_RX_i_cp: coverpoint seq_item_cov.In_Phase_RX_i
         {
-            // Below threshold zones must have flag = 0
-            illegal_bins weak_zone_strong_flag  = binsof(rssi_out_o_cp.rssi_very_weak)      && binsof(signal_flag_o_cp.signal_flag_o_high);
-            illegal_bins below_thresh_strong    = binsof(rssi_out_o_cp.rssi_weak)           && binsof(signal_flag_o_cp.signal_flag_o_high);
-            // Above threshold zones must have flag = 1
-            illegal_bins above_thresh_weak      = binsof(rssi_out_o_cp.rssi_medium)         && binsof(signal_flag_o_cp.signal_flag_o_low);
-            illegal_bins strong_zone_weak_flag  = binsof(rssi_out_o_cp.rssi_strong)         && binsof(signal_flag_o_cp.signal_flag_o_low);
-            illegal_bins vstrong_zone_weak_flag = binsof(rssi_out_o_cp.rssi_very_strong)    && binsof(signal_flag_o_cp.signal_flag_o_low);
+            bins negative  = {[$:12'sh800]};
+            bins zero      = {12'sh000};
+            bins positive  = {12'sh001[$:12'sh7FF]};
         }
 
+        Quadrature_Phase_RX_i_cp: coverpoint seq_item_cov.Quadrature_Phase_RX_i
+        {
+            bins negative  = {[$:12'sh800]};
+            bins zero      = {12'sh000};
+            bins positive  = {12'sh001[$:12'sh7FF]};
+        }
+
+        // Cross: RX valid with actual IQ data present
+        RX_valid_x_InPhase_cp: cross RX_Valid_i_cp, In_Phase_RX_i_cp
+        {
+            bins valid_negative = binsof(RX_Valid_i_cp.rx_valid_high) && binsof(In_Phase_RX_i_cp.negative);
+            bins valid_zero     = binsof(RX_Valid_i_cp.rx_valid_high) && binsof(In_Phase_RX_i_cp.zero);
+            bins valid_positive = binsof(RX_Valid_i_cp.rx_valid_high) && binsof(In_Phase_RX_i_cp.positive);
+            bins idle           = binsof(RX_Valid_i_cp.rx_valid_low);
+        }
+
+        //======================================================================
+        // RX Output Coverpoints
+        //======================================================================
         rx_bit_o_cp: coverpoint seq_item_cov.rx_bit_o 
         {
             bins rising  = (1'b0 => 1'b1);
@@ -117,22 +136,38 @@ class PHY_coverage extends uvm_component;
 
         rx_bit_valid_o_cp: coverpoint seq_item_cov.rx_bit_valid_o 
         {
-            bins rx_bit_valid_low    = {1'b0};
-            bins rx_bit_valid_high   = {1'b1};
+            bins rx_bit_valid_low  = {1'b0};
+            bins rx_bit_valid_high = {1'b1};
         }
-        
+
+        // Cross: only care about rx_bit value when rx_bit_valid is high
+        rx_valid_x_bit_cp: cross rx_bit_valid_o_cp, rx_bit_o_cp
+        {
+            bins valid_bit_low  = binsof(rx_bit_valid_o_cp.rx_bit_valid_high) && binsof(rx_bit_o_cp.falling);
+            bins valid_bit_high = binsof(rx_bit_valid_o_cp.rx_bit_valid_high) && binsof(rx_bit_o_cp.rising);
+            bins invalid        = binsof(rx_bit_valid_o_cp.rx_bit_valid_low);
+        }
+
+        //======================================================================
+        // RSSI Output Coverpoints
+        //======================================================================
+        signal_flag_o_cp: coverpoint seq_item_cov.signal_flag_o
+        {
+            bins signal_flag_o_low  = {1'b0};
+            bins signal_flag_o_high = {1'b1};
+        }
     endgroup
 
 
     function new(string name = "PHY_coverage" , uvm_component parent = null);
         super.new(name , parent);
         cp = new();
-    endfunction //new()
+    endfunction
 
     function void build_phase(uvm_phase phase);
         super.build_phase(phase);
         cov_export = new("cov_export" , this);
-        cov_fifo = new("cov_fifo" , this);
+        cov_fifo   = new("cov_fifo"   , this);
     endfunction
 
     function void connect_phase(uvm_phase phase);
@@ -147,6 +182,7 @@ class PHY_coverage extends uvm_component;
             cp.sample();
         end
     endtask
+
 endclass //PHY_coverage extends uvm_component
     
 endpackage

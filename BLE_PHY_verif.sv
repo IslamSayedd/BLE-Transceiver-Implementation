@@ -42,33 +42,41 @@ module BLE_PHY_verif (BLE_PHY_if.DUT PHY_if);
     logic [TAP_WIDTH-1:0]            tap_value_i;
     logic [ADDRESS_WIDTH-1:0]        tap_address_i;
 
+    // RX Inputs
+    logic [VCO_OUT_SIZE-1:0]         Quadrature_Phase_RX_i;
+    logic [VCO_OUT_SIZE-1:0]         In_Phase_RX_i;
+    logic                            RX_Valid_i;
+
     //==========================================================================
     // Logic Signals — Outputs
     //==========================================================================
+    logic [VCO_OUT_SIZE-1:0]         Quadrature_Phase_AGC_o;
+    logic [VCO_OUT_SIZE-1:0]         In_Phase_AGC_o;
     logic                            rx_bit_o;
     logic                            rx_bit_valid_o;
-    logic [RSSI_N-1:0]               rssi_out_o;
-    logic                            rssi_valid_o;
     logic                            signal_flag_o;
 
     //==========================================================================
-    // Interface Assignments — Inputs 
+    // Interface Assignments — Inputs
     //==========================================================================
-    assign clk           = PHY_if.clk;
-    assign rst_n         = PHY_if.rst_n;
-    assign phy_bit_i     = PHY_if.phy_bit_i;
-    assign bit_valid_i   = PHY_if.bit_valid_i;
-    assign tap_value_i   = PHY_if.tap_value_i;
-    assign tap_address_i = PHY_if.tap_address_i;
+    assign clk                  = PHY_if.clk;
+    assign rst_n                = PHY_if.rst_n;
+    assign phy_bit_i            = PHY_if.phy_bit_i;
+    assign bit_valid_i          = PHY_if.bit_valid_i;
+    assign tap_value_i          = PHY_if.tap_value_i;
+    assign tap_address_i        = PHY_if.tap_address_i;
+    assign In_Phase_RX_i        = PHY_if.In_Phase_RX_i;
+    assign Quadrature_Phase_RX_i = PHY_if.Quadrature_Phase_RX_i;
+    assign RX_Valid_i           = PHY_if.RX_Valid_i;
 
     //==========================================================================
-    // Interface Assignments — Outputs 
+    // Interface Assignments — Outputs
     //==========================================================================
-    assign PHY_if.rx_bit_o       = rx_bit_o;
-    assign PHY_if.rx_bit_valid_o = rx_bit_valid_o;
-    assign PHY_if.rssi_out_o     = rssi_out_o;
-    assign PHY_if.rssi_valid_o   = rssi_valid_o;
-    assign PHY_if.signal_flag_o  = signal_flag_o;
+    assign PHY_if.In_Phase_AGC_o        = In_Phase_AGC_o;
+    assign PHY_if.Quadrature_Phase_AGC_o = Quadrature_Phase_AGC_o;
+    assign PHY_if.rx_bit_o              = rx_bit_o;
+    assign PHY_if.rx_bit_valid_o        = rx_bit_valid_o;
+    assign PHY_if.signal_flag_o         = signal_flag_o;
 
     //==========================================================================
     // Internal wires — TX outputs — AGC inputs
@@ -78,11 +86,15 @@ module BLE_PHY_verif (BLE_PHY_if.DUT PHY_if);
     logic                            Phase_Valid_w;
 
     //==========================================================================
-    // Internal wires — AGC outputs — RX inputs & RSSI inputs
+    // Internal wires — AGC
     //==========================================================================
-    logic signed [VCO_OUT_SIZE-1:0]  agc_I_w;
-    logic signed [VCO_OUT_SIZE-1:0]  agc_Q_w;
     logic                            agc_valid_w;
+
+    //==========================================================================
+    // Internal wires — RSSI Outputs
+    //==========================================================================
+    logic [RSSI_N-1:0]               rssi_out_o;
+    logic                            rssi_valid_o;
 
     //==========================================================================
     // TX Instantiation
@@ -124,8 +136,8 @@ module BLE_PHY_verif (BLE_PHY_if.DUT PHY_if);
         .valid_in_i     (Phase_Valid_w),
         .I_in_i         (In_Phase_w),
         .Q_in_i         (Quadrature_Phase_w),
-        .I_out_o        (agc_I_w),
-        .Q_out_o        (agc_Q_w),
+        .I_out_o        (In_Phase_AGC_o),
+        .Q_out_o        (Quadrature_Phase_AGC_o),
         .valid_out_o    (agc_valid_w)
     );
 
@@ -143,9 +155,9 @@ module BLE_PHY_verif (BLE_PHY_if.DUT PHY_if);
     ) u_RSSI (
         .clk            (clk),
         .rst_n          (rst_n),
-        .valid_i        (agc_valid_w),
-        .I_in           (agc_I_w),
-        .Q_in           (agc_Q_w),
+        .valid_i        (RX_Valid_i),
+        .I_in           (In_Phase_RX_i),
+        .Q_in           (Quadrature_Phase_RX_i),
         .rssi_out_o     (rssi_out_o),
         .rssi_valid_o   (rssi_valid_o),
         .signal_flag_o  (signal_flag_o)
@@ -161,9 +173,9 @@ module BLE_PHY_verif (BLE_PHY_if.DUT PHY_if);
     ) u_RX (
         .clk                (clk),
         .rst_n              (rst_n),
-        .in_phase_i_i       (agc_I_w),
-        .quadrature_q_i     (agc_Q_w),
-        .iq_valid_i         (agc_valid_w),
+        .in_phase_i_i       (In_Phase_RX_i),
+        .quadrature_q_i     (Quadrature_Phase_RX_i),
+        .iq_valid_i         (RX_Valid_i),
         .rx_bit_o           (rx_bit_o),
         .rx_bit_valid_o     (rx_bit_valid_o)
     );

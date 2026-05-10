@@ -1,6 +1,4 @@
-interface BLE_PHY_if(clk);
-
-    input bit clk;
+interface BLE_PHY_if(input bit clk);
 
     ////////////////////////////////////////////////////
     /////////////////////Parameters/////////////////////
@@ -38,35 +36,47 @@ interface BLE_PHY_if(clk);
     ///////////////////////////////////////////////
     /////////////////////Ports/////////////////////
     ///////////////////////////////////////////////
-    
+
     // TX Signals
-    logic                            clk;
     logic                            rst_n;
     logic                            phy_bit_i;
     logic                            bit_valid_i;
     logic [TAP_WIDTH-1:0]            tap_value_i;
     logic [ADDRESS_WIDTH-1:0]        tap_address_i;
 
-    
-    // RX Signals
+    // AGC Outputs (TX path)
+    logic [VCO_OUT_SIZE-1:0]         Quadrature_Phase_AGC_o;
+    logic [VCO_OUT_SIZE-1:0]         In_Phase_AGC_o;
+
+    // RX Signals — Inputs
+    logic [VCO_OUT_SIZE-1:0]         Quadrature_Phase_RX_i;
+    logic [VCO_OUT_SIZE-1:0]         In_Phase_RX_i;
+    logic                            RX_Valid_i;
+
+    // RX Signals — Outputs
     logic                            rx_bit_o;
     logic                            rx_bit_valid_o;
 
-
-    // RSSI Outputs
-    logic [RSSI_N-1:0]               rssi_out_o;
-    logic                            rssi_valid_o;
+    // RSSI Output
     logic                            signal_flag_o;
-
-    
 
     ///////////////////////////////////////////////////////
     ///////////////Defining Modports///////////////////////
     ///////////////////////////////////////////////////////
-    modport DUT ( input clk , rst_n , phy_bit_i , bit_valid_i , tap_value_i , tap_address_i , 
-    output rx_bit_o , rx_bit_valid_o , rssi_out_o , rssi_valid_o , signal_flag_o );
+    modport DUT (
+        input  clk, rst_n, phy_bit_i, bit_valid_i, tap_value_i, tap_address_i,
+               Quadrature_Phase_RX_i, In_Phase_RX_i, RX_Valid_i,
+        output Quadrature_Phase_AGC_o, In_Phase_AGC_o,
+               rx_bit_o, rx_bit_valid_o,
+               signal_flag_o
+    );
 
-    modport sva ( input clk , rst_n , phy_bit_i , bit_valid_i , tap_value_i , tap_address_i , 
-    rx_bit_o , rx_bit_valid_o , rssi_out_o , rssi_valid_o , signal_flag_o );
-    
+    modport sva (
+        input  clk, rst_n, phy_bit_i, bit_valid_i, tap_value_i, tap_address_i,
+               Quadrature_Phase_RX_i, In_Phase_RX_i, RX_Valid_i,
+               Quadrature_Phase_AGC_o, In_Phase_AGC_o,
+               rx_bit_o, rx_bit_valid_o,
+               signal_flag_o
+    );
+
 endinterface

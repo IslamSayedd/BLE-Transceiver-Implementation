@@ -12,8 +12,8 @@ module BLE_PHY_top ();
     end
 
     BLE_PHY_if PHY_if (clk);
-    BLE_PHY DUT(PHY_if);
-    bind BLE_PHY PHY_sva BLE_PHY_if_inst (PHY_if);
+    BLE_PHY_verif DUT(PHY_if);
+    bind BLE_PHY_verif PHY_sva BLE_PHY_if_inst (PHY_if);
 
     initial begin
         uvm_config_db #(virtual BLE_PHY_if) ::set (null , "uvm_test_top" , "BLE_PHY_if" , PHY_if);

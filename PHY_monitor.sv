@@ -22,16 +22,30 @@ class PHY_monitor extends uvm_monitor;
         forever begin
             rsp_seq_item = PHY_seq_item::type_id::create("PHY_seq_item");
             @(negedge BLE_PHY_vif.clk);
-            rsp_seq_item.rst_n          =   BLE_PHY_vif.rst_n;
-            rsp_seq_item.phy_bit_i      =   BLE_PHY_vif.phy_bit_i;
-            rsp_seq_item.bit_valid_i    =   BLE_PHY_vif.bit_valid_i;
-            rsp_seq_item.tap_value_i    =   BLE_PHY_vif.tap_value_i;
-            rsp_seq_item.tap_address_i  =   BLE_PHY_vif.tap_address_i;
-            rsp_seq_item.rssi_out_o     =   BLE_PHY_vif.rssi_out_o;
-            rsp_seq_item.rssi_valid_o   =   BLE_PHY_vif.rssi_valid_o;
-            rsp_seq_item.signal_flag_o  =   BLE_PHY_vif.signal_flag_o;
-            rsp_seq_item.rx_bit_o       =   BLE_PHY_vif.rx_bit_o;
-            rsp_seq_item.rx_bit_valid_o =   BLE_PHY_vif.rx_bit_valid_o;
+            
+            // TX Inputs
+            rsp_seq_item.rst_n                   = BLE_PHY_vif.rst_n;
+            rsp_seq_item.phy_bit_i               = BLE_PHY_vif.phy_bit_i;
+            rsp_seq_item.bit_valid_i             = BLE_PHY_vif.bit_valid_i;
+            rsp_seq_item.tap_value_i             = BLE_PHY_vif.tap_value_i;
+            rsp_seq_item.tap_address_i           = BLE_PHY_vif.tap_address_i;
+
+            // AGC Outputs (TX path)
+            rsp_seq_item.Quadrature_Phase_AGC_o  = BLE_PHY_vif.Quadrature_Phase_AGC_o;
+            rsp_seq_item.In_Phase_AGC_o          = BLE_PHY_vif.In_Phase_AGC_o;
+
+            // RX Inputs
+            rsp_seq_item.Quadrature_Phase_RX_i   = BLE_PHY_vif.Quadrature_Phase_RX_i;
+            rsp_seq_item.In_Phase_RX_i           = BLE_PHY_vif.In_Phase_RX_i;
+            rsp_seq_item.RX_Valid_i              = BLE_PHY_vif.RX_Valid_i;
+
+            // RX Outputs
+            rsp_seq_item.rx_bit_o                = BLE_PHY_vif.rx_bit_o;
+            rsp_seq_item.rx_bit_valid_o          = BLE_PHY_vif.rx_bit_valid_o;
+
+            // RSSI Output
+            rsp_seq_item.signal_flag_o           = BLE_PHY_vif.signal_flag_o;
+
             mon_ap.write(rsp_seq_item);
             `uvm_info("run_phase" , rsp_seq_item.convert2string() , UVM_HIGH);
         end
