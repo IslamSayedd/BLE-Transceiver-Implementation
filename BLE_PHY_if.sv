@@ -71,12 +71,5 @@ interface BLE_PHY_if(input bit clk);
                signal_flag_o
     );
 
-    modport sva (
-        input  clk, rst_n, phy_bit_i, bit_valid_i, tap_value_i, tap_address_i,
-               Quadrature_Phase_RX_i, In_Phase_RX_i, RX_Valid_i,
-               Quadrature_Phase_AGC_o, In_Phase_AGC_o,
-               rx_bit_o, rx_bit_valid_o,
-               signal_flag_o
-    );
 
 endinterface
