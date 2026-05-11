@@ -25,7 +25,7 @@ module bit_downsampler #(
             bit_valid_o <= 0;   // default
 
             if (bit_valid_i) begin
-                if (cnt == SAMPLE_PER_SYMBOL-1) begin
+                if (cnt == $unsigned(SAMPLE_PER_SYMBOL-1)) begin
                     cnt         <= 0;
                     bit_o       <= bit_i;
                     bit_valid_o <= 1'b1;

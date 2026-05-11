@@ -7,7 +7,7 @@ module Gain_Control # (parameter POWER_TARGET = 33'd4294967296,
  input   wire                       rst_n,
  input   wire       [ IN_SIZE-1:0 ] power_i,
  input   wire                       power_valid_i, 
- output  reg        [ OUT-1:0 ]     gain_o,
+ output  reg   signed     [ OUT-1:0 ]     gain_o,
  output  reg                        gain_valid_o
 );
 
@@ -41,7 +41,7 @@ module Gain_Control # (parameter POWER_TARGET = 33'd4294967296,
         end
  end
 
-=
+
  always @(posedge clk or negedge rst_n)
  begin
     if (~rst_n)

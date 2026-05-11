@@ -8,7 +8,7 @@ module NRZ #(
   input wire phy_bit_i,
   input wire bit_valid_i,
   
-  output reg [1:0] NRZ_o,
+  output reg signed [1:0] NRZ_o,
   output reg NRZ_valid_o
 );
 
@@ -17,7 +17,7 @@ integer count_loop; //for output
 reg Done;
 reg flag_done;
 integer counter;
-reg [ 1 : 0] NRZ_reg [DATA_WIDTH - 1 : 0];
+reg signed [1:0] NRZ_reg [DATA_WIDTH - 1 : 0];
 
 //Input
 always @ (posedge clk or negedge rst_n) 
@@ -77,6 +77,7 @@ always@(posedge clk or negedge rst_n)
 assign  flag_done = ((Done || count_loop != 'b0) && (count_loop != DATA_WIDTH ))? 'b1 :'b0 ; // to ensure that the flag is 1 first when the done is 1 and then until i send all the data
 
 endmodule 
+
 
 
 

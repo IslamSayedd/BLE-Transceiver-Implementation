@@ -1,90 +1,144 @@
 module gaussian_filter # (
-    parameter TAP_WIDTH = 16 , 
-    parameter OUT_WIDTH = 16 ,
-    parameter ADDRESS_WIDTH = 4 ,
-    parameter NUM_OF_TAPS = 9
-) (
+    parameter TAP_WIDTH    = 16,
+    parameter OUT_WIDTH    = 16,
+    parameter ADDRESS_WIDTH= 4,
+    parameter NUM_OF_TAPS  = 9
+)(
     input  logic clk,
     input  logic rst_n,
 
-    input  logic bit_upsample_valid_i,                      //From Upsample Block (Take 8 1's or 8 0's)
-    input  logic bit_upsample_i,                            //From Upsample Block
+    // From Upsample Block
+    input  logic bit_upsample_valid_i,
+    input  logic bit_upsample_i,
 
-    input  logic [TAP_WIDTH - 1 : 0] tap_value_i,           //Interface Input
-    input  logic [ADDRESS_WIDTH - 1 : 0] tap_address_i,     //Interface Input
+    // Tap programming interface
+    input  logic signed [TAP_WIDTH-1:0] tap_value_i,
+    input  logic        [ADDRESS_WIDTH-1:0] tap_address_i,
 
-    output logic signed [OUT_WIDTH - 1  : 0] gaussian_filter_o,
-    output logic gaussian_filter_out_valid_o
+    // Filter output
+    output logic signed [OUT_WIDTH-1:0] gaussian_filter_o,
+    output logic                        gaussian_filter_out_valid_o
 );
 
-localparam NUM_SAMPLES = (NUM_OF_TAPS - 1) * 2 ;         //If 9 taps --> 16 (0---->15)
-localparam NUM_PRE_ACC_TAPS = (NUM_OF_TAPS * 2) - 1 ;    //If 9 taps --> 17 (0---->16)
+    ////////////////////////////////////////////////////////////
+    ////////////////////// Local Params ////////////////////////
+    ////////////////////////////////////////////////////////////
 
-int i ;
-int k ;
-int j ;
+    // If 9 taps --> 16 samples
+    localparam NUM_SAMPLES = (NUM_OF_TAPS - 1) * 2;
 
-logic signed [OUT_WIDTH-1:0] acc_comb;
+    // If 9 taps --> 17 pre-accum values
+    localparam NUM_PRE_ACC_TAPS = (NUM_OF_TAPS * 2) - 1;
 
-//Shift register for input samples
-logic [NUM_SAMPLES - 1 : 0] samples ;
+    ////////////////////////////////////////////////////////////
+    ////////////////////// Internal Signals ////////////////////
+    ////////////////////////////////////////////////////////////
 
-//A memory to store the values of the Taps
-logic [TAP_WIDTH - 1 : 0] store_taps [NUM_OF_TAPS - 1 : 0]; 
-//Mem of Variables to map the tap values to positive or negative
-logic signed [TAP_WIDTH - 1 : 0] pre_accum_tap [NUM_PRE_ACC_TAPS - 1 : 0]; 
+    integer i;
+    integer j;
+    integer k;
 
+    // Accumulator
+    logic signed [OUT_WIDTH-1:0] acc_comb;
 
-always @(posedge clk or negedge rst_n) begin
+    // Shift register for incoming bits
+    logic [NUM_SAMPLES-1:0] samples;
 
-    if (!rst_n) begin
-        for (i = 0; i < NUM_OF_TAPS; i++) begin
-            store_taps[i] <= 'd0;
-        end
-        samples   <= 'd0;
-        gaussian_filter_o <= 'd0;
-        gaussian_filter_out_valid_o <= 'b0;
-    end 
+    // Store Gaussian taps (SIGNED)
+    logic signed [TAP_WIDTH-1:0]
+        store_taps [NUM_OF_TAPS-1:0];
 
-    else begin
-        store_taps [tap_address_i]  <= tap_value_i;
-        if (bit_upsample_valid_i) begin
-            //Any new sample stored in [0] and others shift
-            samples [ NUM_SAMPLES - 1 : 1 ] <= samples [ NUM_SAMPLES - 2 : 0];
-            samples [0] <= bit_upsample_i;
+    // Positive/negative mapped taps
+    logic signed [TAP_WIDTH-1:0]
+        pre_accum_tap [NUM_PRE_ACC_TAPS-1:0];
 
-            gaussian_filter_out_valid_o <= 1'b1;
+    ////////////////////////////////////////////////////////////
+    ////////////////////// Sequential Logic ////////////////////
+    ////////////////////////////////////////////////////////////
 
-            // Summation {g(𝑡) = 𝑐(𝑡) ∗ ℎ(𝑡)}
-            gaussian_filter_o  <= acc_comb;
+    always @(posedge clk or negedge rst_n) begin
+
+        if (!rst_n) begin
+
+            for (i = 0; i < NUM_OF_TAPS; i = i + 1) begin
+                store_taps[i] <= '0;
+            end
+
+            samples                     <= '0;
+            gaussian_filter_o           <= '0;
+            gaussian_filter_out_valid_o <= 1'b0;
         end
 
         else begin
-            gaussian_filter_out_valid_o <= 1'b0;
-            gaussian_filter_o  <= 'd0;
+
+            // Load tap values
+            store_taps[tap_address_i] <= tap_value_i;
+
+            if (bit_upsample_valid_i) begin
+
+                // Shift samples
+                samples[NUM_SAMPLES-1:1]
+                    <= samples[NUM_SAMPLES-2:0];
+
+                samples[0] <= bit_upsample_i;
+
+                gaussian_filter_out_valid_o <= 1'b1;
+
+                // FIR output
+                gaussian_filter_o <= acc_comb;
+            end
+
+            else begin
+                gaussian_filter_out_valid_o <= 1'b0;
+                gaussian_filter_o           <= '0;
+            end
         end
     end
-end  
 
-//Mapping
-always @(*) begin
-    // g(𝑡) = 𝑐(𝑡) ∗ ℎ(𝑡)        ℎ(𝑡) ---> taps      𝑐(𝑡) ---> Input (1/0)
-    pre_accum_tap [0]  = (bit_upsample_i)   ? store_taps [0] : -store_taps [0];
+    ////////////////////////////////////////////////////////////
+    ////////////////////// Tap Mapping /////////////////////////
+    ////////////////////////////////////////////////////////////
 
-    for (k = 1 ; k < NUM_OF_TAPS ; k = k + 1 ) begin
-        pre_accum_tap[k] = (samples[k-1]) ? store_taps[k] : -store_taps[k];
+    always @(*) begin
+
+        // Current sample
+        pre_accum_tap[0] =
+            (bit_upsample_i) ?
+            store_taps[0] :
+            -store_taps[0];
+
+        // Left side taps
+        for (k = 1; k < NUM_OF_TAPS; k = k + 1) begin
+
+            pre_accum_tap[k] =
+                (samples[k-1]) ?
+                store_taps[k] :
+                -store_taps[k];
+        end
+
+        // Mirrored right side taps
+        for (j = NUM_OF_TAPS;
+             j < NUM_PRE_ACC_TAPS;
+             j = j + 1) begin
+
+            pre_accum_tap[j] =
+                (samples[j-1]) ?
+                store_taps[(NUM_PRE_ACC_TAPS-1)-j] :
+                -store_taps[(NUM_PRE_ACC_TAPS-1)-j];
+        end
     end
 
-    for (j = NUM_OF_TAPS ; j < NUM_PRE_ACC_TAPS ; j = j + 1) begin
-        pre_accum_tap[j] = (samples[j-1]) ? store_taps[ (NUM_PRE_ACC_TAPS - 1) - j ] : -store_taps[ (NUM_PRE_ACC_TAPS - 1) - j ];
-    end
-end
+    ////////////////////////////////////////////////////////////
+    ////////////////////// Accumulator /////////////////////////
+    ////////////////////////////////////////////////////////////
 
-always @(*) begin
-    acc_comb = '0;
-    for (i = 0; i < NUM_PRE_ACC_TAPS; i++) begin
-        acc_comb = acc_comb + pre_accum_tap[i];
+    always @(*) begin
+
+        acc_comb = '0;
+
+        for (i = 0; i < NUM_PRE_ACC_TAPS; i = i + 1) begin
+            acc_comb = acc_comb + pre_accum_tap[i];
+        end
     end
-end
 
 endmodule

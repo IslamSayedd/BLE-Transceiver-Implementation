@@ -18,7 +18,7 @@ module VCO #(
     wire                 phase_valid_i;
 
     // 1) Accumulator: Gaussian filter -> Phase index
-    accumulator #(
+    Accumulator #(
         .OUT_WIDTH (OUT_WIDTH),
         .DATA_WIDTH(DATA_WIDTH)
     ) u_accumulator (

@@ -16,7 +16,7 @@ integer counter_out;
 integer loop_out;
 reg                             phy_bit_reg_in;
 reg [ SAMPLE_PER_SYMBOL -1 : 0] bit_upsample_reg [DATA_WIDTH - 1 : 0];
-wire out_flag;
+logic out_flag;
 always @ (posedge clk or negedge rst_n) 
   begin
     if (!rst_n) 

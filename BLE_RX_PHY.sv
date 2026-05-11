@@ -18,7 +18,7 @@ module BLE_RX_PHY #(
     // ===============================
     //   FSK Demodulator
     // ===============================
-    fsk_demod #(
+    fsk_demod_mult_v1 #(
         .IQ_BIT_WIDTH (IQ_BIT_WIDTH)
     ) u_fsk_demod (
         .CLK_i                (clk),
