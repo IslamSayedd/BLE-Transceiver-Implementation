@@ -1,7 +1,7 @@
 module upsample #
 (
-  parameter SAMPLE_PER_SYMBOL = 8, //number for repeatition
-            DATA_WIDTH = 11 //number of bits from the mux
+  parameter SAMPLE_PER_SYMBOL = 8,
+            DATA_WIDTH = 11
 ) (
   input wire clk,
   input wire rst_n,
@@ -14,9 +14,12 @@ module upsample #
 integer counter;
 integer counter_out;
 integer loop_out;
-reg                             phy_bit_reg_in;
+reg phy_bit_reg_in;
 reg [ SAMPLE_PER_SYMBOL -1 : 0] bit_upsample_reg [DATA_WIDTH - 1 : 0];
 logic out_flag;
+
+integer k; // for reset loop
+
 always @ (posedge clk or negedge rst_n) 
   begin
     if (!rst_n) 
@@ -27,10 +30,12 @@ always @ (posedge clk or negedge rst_n)
         phy_bit_reg_in       <= 'b0;
         loop_out             <= 'b0;
         counter_out          <= 'b0;
+        for (k = 0; k < DATA_WIDTH; k = k + 1)
+          bit_upsample_reg[k] <= 'b0;    
       end 
     else 
       begin
-        // Input side: fill bit_upsample_reg from NRZ input
+        // Input side
         if (NRZ_valid_i)
           begin
             if (counter == DATA_WIDTH)
@@ -45,7 +50,7 @@ always @ (posedge clk or negedge rst_n)
           bit_upsample_reg[counter] <= 'b0;
         end
 
-        // Output side: stream out the stored register array
+        // Output side
         if (out_flag)
           begin
             if (counter_out != DATA_WIDTH)
@@ -58,6 +63,7 @@ always @ (posedge clk or negedge rst_n)
                   end
                 else
                   begin
+                    bit_upsample_o       <= 'b0;    
                     loop_out             <= 'b0;
                     counter_out          <= counter_out + 1;
                     bit_upsample_valid_o <= 'b1;
@@ -67,6 +73,7 @@ always @ (posedge clk or negedge rst_n)
         else
           begin
             counter_out          <= 'b0;
+            bit_upsample_o       <= 'b0;           
             bit_upsample_valid_o <= 'b0;
           end
       end
