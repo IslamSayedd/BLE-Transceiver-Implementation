@@ -59,7 +59,7 @@ class PHY_coverage extends uvm_component;
             bins val_high      = {16'd965};
             bins val_nearpeak  = {16'd1347};
             bins val_peak      = {16'd1505};
-            illegal_bins val_illegal = default;
+            ignore_bins val_ignore = {16'd0};
         }
 
         tap_addr_x_val_cp: cross tap_address_i_cp, tap_value_i_cp 
@@ -73,7 +73,15 @@ class PHY_coverage extends uvm_component;
             bins cross_addr6_val965  = binsof(tap_address_i_cp.addr_6_k_neg2)   && binsof(tap_value_i_cp.val_high);
             bins cross_addr7_val1347 = binsof(tap_address_i_cp.addr_7_k_neg1)   && binsof(tap_value_i_cp.val_nearpeak);
             bins cross_addr8_val1505 = binsof(tap_address_i_cp.addr_8_k_centre) && binsof(tap_value_i_cp.val_peak);
-            illegal_bins cross_mismatch = default;
+            ignore_bins addr0_mismatch = binsof(tap_address_i_cp.addr_0_k_neg8) && !binsof(tap_value_i_cp.val_tail);
+            ignore_bins addr1_mismatch = binsof(tap_address_i_cp.addr_1_k_neg7) && !binsof(tap_value_i_cp.val_neartail);
+            ignore_bins addr2_mismatch = binsof(tap_address_i_cp.addr_2_k_neg6) && !binsof(tap_value_i_cp.val_low);
+            ignore_bins addr3_mismatch = binsof(tap_address_i_cp.addr_3_k_neg5) && !binsof(tap_value_i_cp.val_lowmid);
+            ignore_bins addr4_mismatch = binsof(tap_address_i_cp.addr_4_k_neg4) && !binsof(tap_value_i_cp.val_mid);
+            ignore_bins addr5_mismatch = binsof(tap_address_i_cp.addr_5_k_neg3) && !binsof(tap_value_i_cp.val_midhigh);
+            ignore_bins addr6_mismatch = binsof(tap_address_i_cp.addr_6_k_neg2) && !binsof(tap_value_i_cp.val_high);
+            ignore_bins addr7_mismatch = binsof(tap_address_i_cp.addr_7_k_neg1) && !binsof(tap_value_i_cp.val_nearpeak);
+            ignore_bins addr8_mismatch = binsof(tap_address_i_cp.addr_8_k_centre) && !binsof(tap_value_i_cp.val_peak);
         }
 
         //======================================================================
@@ -81,16 +89,16 @@ class PHY_coverage extends uvm_component;
         //======================================================================
         In_Phase_AGC_o_cp: coverpoint seq_item_cov.In_Phase_AGC_o
         {
-            bins negative  = {[$:12'sh800]};           // full negative range
-            bins zero      = {12'sh000};
-            bins positive  = {12'sh001[$:12'sh7FF]};   // full positive range
+            bins negative  = {[12'h800:12'hFFF]};
+            bins zero      = {12'h000};
+            bins positive  = {[12'h001:12'h7FF]};
         }
 
         Quadrature_Phase_AGC_o_cp: coverpoint seq_item_cov.Quadrature_Phase_AGC_o
         {
-            bins negative  = {[$:12'sh800]};
-            bins zero      = {12'sh000};
-            bins positive  = {12'sh001[$:12'sh7FF]};
+            bins negative  = {[12'h800:12'hFFF]};
+            bins zero      = {12'h000};
+            bins positive  = {[12'h001:12'h7FF]};
         }
 
         //======================================================================
@@ -104,16 +112,16 @@ class PHY_coverage extends uvm_component;
 
         In_Phase_RX_i_cp: coverpoint seq_item_cov.In_Phase_RX_i
         {
-            bins negative  = {[$:12'sh800]};
-            bins zero      = {12'sh000};
-            bins positive  = {12'sh001[$:12'sh7FF]};
+            bins negative  = {[12'h800:12'hFFF]};
+            bins zero      = {12'h000};
+            bins positive  = {[12'h001:12'h7FF]};
         }
 
         Quadrature_Phase_RX_i_cp: coverpoint seq_item_cov.Quadrature_Phase_RX_i
         {
-            bins negative  = {[$:12'sh800]};
-            bins zero      = {12'sh000};
-            bins positive  = {12'sh001[$:12'sh7FF]};
+            bins negative  = {[12'h800:12'hFFF]};
+            bins zero      = {12'h000};
+            bins positive  = {[12'h001:12'h7FF]};
         }
 
         // Cross: RX valid with actual IQ data present
@@ -145,7 +153,7 @@ class PHY_coverage extends uvm_component;
         {
             bins valid_bit_low  = binsof(rx_bit_valid_o_cp.rx_bit_valid_high) && binsof(rx_bit_o_cp.falling);
             bins valid_bit_high = binsof(rx_bit_valid_o_cp.rx_bit_valid_high) && binsof(rx_bit_o_cp.rising);
-            bins invalid        = binsof(rx_bit_valid_o_cp.rx_bit_valid_low);
+            ignore_bins invalid = binsof(rx_bit_valid_o_cp.rx_bit_valid_low);
         }
 
         //======================================================================

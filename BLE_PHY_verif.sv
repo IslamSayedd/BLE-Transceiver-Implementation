@@ -12,10 +12,13 @@ module BLE_PHY_verif (BLE_PHY_if.DUT PHY_if);
     parameter ADDRESS_WIDTH     = PHY_if.ADDRESS_WIDTH;
     parameter NUM_OF_TAPS       = PHY_if.NUM_OF_TAPS;
 
-    // VCO
-    parameter VCO_OUT_WIDTH     = PHY_if.VCO_OUT_WIDTH;
-    parameter VCO_DATA_WIDTH    = PHY_if.VCO_DATA_WIDTH;
-    parameter VCO_OUT_SIZE      = PHY_if.VCO_OUT_SIZE;
+    // VCO — must be 16-bit to match LUT files
+    parameter VCO_OUT_WIDTH     = 16;
+    parameter VCO_DATA_WIDTH    = 16;
+    parameter VCO_OUT_SIZE      = 16;
+
+    // IQ width after truncation to 12-bit
+    localparam IQ_WIDTH         = PHY_if.VCO_OUT_SIZE;  // 12
 
     // AGC
     parameter AGC_IQ_WIDTH      = PHY_if.AGC_IQ_WIDTH;
@@ -50,8 +53,8 @@ module BLE_PHY_verif (BLE_PHY_if.DUT PHY_if);
     //==========================================================================
     // Logic Signals — Outputs
     //==========================================================================
-    logic [VCO_OUT_SIZE-1:0]         Quadrature_Phase_AGC_o;
-    logic [VCO_OUT_SIZE-1:0]         In_Phase_AGC_o;
+    logic [IQ_WIDTH-1:0]             Quadrature_Phase_AGC_o;
+    logic [IQ_WIDTH-1:0]             In_Phase_AGC_o;
     logic                            rx_bit_o;
     logic                            rx_bit_valid_o;
     logic                            signal_flag_o;
@@ -79,11 +82,20 @@ module BLE_PHY_verif (BLE_PHY_if.DUT PHY_if);
     assign PHY_if.signal_flag_o         = signal_flag_o;
 
     //==========================================================================
-    // Internal wires — TX outputs — AGC inputs
+    // Internal wires — TX outputs (16-bit VCO output)
     //==========================================================================
     logic [VCO_OUT_SIZE-1:0]         Quadrature_Phase_w;
     logic [VCO_OUT_SIZE-1:0]         In_Phase_w;
     logic                            Phase_Valid_w;
+
+    //==========================================================================
+    // Internal wires — Truncated 12-bit IQ (VCO 16-bit → 12-bit)
+    //==========================================================================
+    logic signed [IQ_WIDTH-1:0]      Quadrature_Phase_12_w;
+    logic signed [IQ_WIDTH-1:0]      In_Phase_12_w;
+
+    assign In_Phase_12_w         = In_Phase_w[IQ_WIDTH-1:0];
+    assign Quadrature_Phase_12_w = Quadrature_Phase_w[IQ_WIDTH-1:0];
 
     //==========================================================================
     // Internal wires — AGC
@@ -122,10 +134,10 @@ module BLE_PHY_verif (BLE_PHY_if.DUT PHY_if);
     );
 
     //==========================================================================
-    // AGC Instantiation
+    // AGC Instantiation — takes truncated 12-bit IQ
     //==========================================================================
     agc_top #(
-        .IQ_WIDTH       (VCO_OUT_SIZE),
+        .IQ_WIDTH       (IQ_WIDTH),
         .AGC_IQ_WIDTH   (AGC_IQ_WIDTH),
         .AVG_LOG2       (AGC_AVG_LOG2),
         .POWER_TARGET   (AGC_POWER_TARGET),
@@ -134,8 +146,8 @@ module BLE_PHY_verif (BLE_PHY_if.DUT PHY_if);
         .clk            (clk),
         .rst_n          (rst_n),
         .valid_in_i     (Phase_Valid_w),
-        .I_in_i         (In_Phase_w),
-        .Q_in_i         (Quadrature_Phase_w),
+        .I_in_i         (In_Phase_12_w),
+        .Q_in_i         (Quadrature_Phase_12_w),
         .I_out_o        (In_Phase_AGC_o),
         .Q_out_o        (Quadrature_Phase_AGC_o),
         .valid_out_o    (agc_valid_w)
@@ -145,7 +157,7 @@ module BLE_PHY_verif (BLE_PHY_if.DUT PHY_if);
     // RSSI Instantiation
     //==========================================================================
     RSSI_TOP #(
-        .N              (RSSI_N),
+        .N              (VCO_OUT_SIZE),
         .DATA_WIDTH     (RSSI_DATA_WIDTH),
         .N_LOG2         (RSSI_N_LOG2),
         .WIDTH          (RSSI_WIDTH),

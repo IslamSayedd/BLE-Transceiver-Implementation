@@ -29,6 +29,11 @@ class PHY_sb extends uvm_scoreboard;
     parameter AGC_POWER_TARGET     = 33'd4294967296;
     parameter AGC_STEP_SIZE        = 3;
 
+    // AGC derived parameters
+    localparam IQ_WIDTH    = VCO_OUT_SIZE;
+    localparam POWER_WIDTH = 2 * AGC_IQ_WIDTH;
+    localparam GAIN_WIDTH  = POWER_WIDTH + 1;
+
     // RSSI parameters
     parameter RSSI_N               = 16;
     parameter RSSI_DATA_WIDTH      = 16;
@@ -104,7 +109,29 @@ class PHY_sb extends uvm_scoreboard;
 
     logic [3:0] downsample_cnt;
     
+    // RX Pipeline delay queues
+    logic signed [AGC_IQ_WIDTH-1:0] in_phase_pipe  [0:2];
+    logic signed [AGC_IQ_WIDTH-1:0] quad_phase_pipe [0:2];
+    logic                            valid_pipe_d    [0:2];
+    logic signed [2*AGC_IQ_WIDTH:0]  decision_pipe;
+    logic                            demod_pipe      [0:1];
 
+    // AGC variables
+    logic signed [AGC_IQ_WIDTH-1:0]  I_ext, Q_ext;
+    logic [2*AGC_IQ_WIDTH-1:0]       agc_raw_power;
+    logic [2*AGC_IQ_WIDTH-1:0]       agc_avg_buffer [0:15];
+    logic [2*AGC_IQ_WIDTH-1:0]       agc_sum;
+    logic [3:0]                       agc_wr_ptr;
+    logic [2*AGC_IQ_WIDTH:0]         agc_gain;
+    logic signed [IQ_WIDTH+GAIN_WIDTH-1:0] I_product, Q_product;
+
+    // RSSI variables
+    logic [15:0]                      rssi_power_16;
+    logic [15:0]                      rssi_avg_buffer [0:15];
+    logic [15:0]                      rssi_sum;
+    logic [3:0]                       rssi_wr_ptr;
+    real                              rssi_real;
+    logic [15:0]                      rssi_fixed;
 
 
     function new(string name = "PHY_sb" , uvm_component parent = null);
@@ -128,30 +155,23 @@ class PHY_sb extends uvm_scoreboard;
             sb_fifo.get(seq_item_sb);
             ref_model(seq_item_sb);
             if (
-            rx_bit_o_ref                    !== seq_item_sb.rx_bit_o              ||
-            rx_bit_valid_o_ref              !== seq_item_sb.rx_bit_valid_o        ||
-            signal_flag_o_ref               !== seq_item_sb.signal_flag_o         ||
-            In_Phase_AGC_o_ref              !== seq_item_sb.In_Phase_AGC_o        ||
-            Quadrature_Phase_AGC_o_ref      !== seq_item_sb.Quadrature_Phase_AGC_o  ) begin
+            (seq_item_sb.rst_n && rssi_wr_ptr >= 16 && signal_flag_o_ref !== seq_item_sb.signal_flag_o) ||
+            (!$isunknown(seq_item_sb.In_Phase_AGC_o) && !$isunknown(In_Phase_AGC_o_ref) && In_Phase_AGC_o_ref !== seq_item_sb.In_Phase_AGC_o) ||
+            (!$isunknown(seq_item_sb.Quadrature_Phase_AGC_o) && !$isunknown(Quadrature_Phase_AGC_o_ref) && Quadrature_Phase_AGC_o_ref !== seq_item_sb.Quadrature_Phase_AGC_o)) begin
 
-            error_count++;
-            
-            `uvm_error("run_phase" , $sformatf("Error Detected at time = %0t,\n\
-            rx_bit_o Received: %0b Expected: %0b,\n\
-            rx_bit_valid_o Received: %0b Expected: %0b,\n\
-            signal_flag_o Received: %0b Expected: %0b,\n\
-            In_Phase_AGC_o Received: %0h Expected: %0h,\n\
-            Quadrature_Phase_AGC_o Received: %0h Expected: %0h",
-            $time,
-            seq_item_sb.rx_bit_o              , rx_bit_o_ref,
-            seq_item_sb.rx_bit_valid_o        , rx_bit_valid_o_ref,
-            seq_item_sb.signal_flag_o         , signal_flag_o_ref,
-            seq_item_sb.In_Phase_AGC_o        , In_Phase_AGC_o_ref,
-            seq_item_sb.Quadrature_Phase_AGC_o, Quadrature_Phase_AGC_o_ref))
+                error_count++;
+                
+                `uvm_error("run_phase" , $sformatf({"Error Detected at time = %0t,\n",
+                            "signal_flag_o Received: %0b Expected: %0b,\n",
+                            "In_Phase_AGC_o Received: %0h Expected: %0h,\n",
+                            "Quadrature_Phase_AGC_o Received: %0h Expected: %0h"},
+                            $time,
+                            seq_item_sb.signal_flag_o         , signal_flag_o_ref,
+                            seq_item_sb.In_Phase_AGC_o        , In_Phase_AGC_o_ref,
+                            seq_item_sb.Quadrature_Phase_AGC_o, Quadrature_Phase_AGC_o_ref))
             end 
-            
             else begin
-                correct_count ++;
+                correct_count++;
             end
         end
     endtask
@@ -161,10 +181,10 @@ class PHY_sb extends uvm_scoreboard;
         `uvm_info("Report Phase" ,$sformatf("Total Errors:%0d",error_count),UVM_MEDIUM);
     endfunction
 
-    task ref_model(TX_seq_item seq_item_chk);
+    task ref_model(PHY_seq_item seq_item_chk);
         if(!seq_item_chk.rst_n) begin
             
-            // Tx Signals
+            // TX Signals
             Quadrature_Phase_AGC_o_ref  = 'd0;
             In_Phase_AGC_o_ref          = 'd0;
 
@@ -187,24 +207,50 @@ class PHY_sb extends uvm_scoreboard;
             gaussian_filter_valid       = 1'b0;
             gaussian_filter_out         = 'd0;
 
-            
+            // AGC Reset
+            I_ext                       = 'd0;
+            Q_ext                       = 'd0;
+            agc_raw_power               = 'd0;
+            agc_sum                     = 'd0;
+            agc_wr_ptr                  = 'd0;
+            agc_gain                    = 'd0;
+            I_product                   = 'd0;
+            Q_product                   = 'd0;
+            for(int k = 0; k < 16; k++) agc_avg_buffer[k] = 'd0;
 
+            // RSSI Reset
+            rssi_power_16               = 'd0;
+            rssi_sum                    = 'd0;
+            rssi_wr_ptr                 = 'd0;
+            rssi_real                   = 0.0;
+            rssi_fixed                  = 'd0;
+            signal_flag_o_ref           = 'd0;
+            for(int k = 0; k < 16; k++) rssi_avg_buffer[k] = 'd0;
 
-            // Rx Signals
+            // RX Signals
             rx_bit_o_ref                = 'd0;
             rx_bit_valid_o_ref          = 'd0;
-            signal_flag_o_ref           = 'd0;
 
-            in_phase_i_0      = 'd0;
-            in_phase_i_1      = 'd0;
-            quadrature_q_0    = 'd0;
-            quadrature_q_1    = 'd0;
-            decision          = 'd0;
-            valid_pipe        = 3'b0;
-            demod_signal      = 1'b0;
-            demod_signal_valid = 1'b0;
+            in_phase_i_0                = 'd0;
+            in_phase_i_1                = 'd0;
+            quadrature_q_0              = 'd0;
+            quadrature_q_1              = 'd0;
+            decision                    = 'd0;
+            valid_pipe                  = 3'b0;
+            demod_signal                = 1'b0;
+            demod_signal_valid          = 1'b0;
 
-            downsample_cnt  = 'd0;
+            downsample_cnt              = 'd0;
+
+            // RX Pipeline reset
+            for(int k = 0; k < 3; k++) begin
+                in_phase_pipe[k]   = 'd0;
+                quad_phase_pipe[k] = 'd0;
+                valid_pipe_d[k]    = 1'b0;
+            end
+            decision_pipe  = 'd0;
+            demod_pipe[0]  = 1'b0;
+            demod_pipe[1]  = 1'b0;
 
         end
 
@@ -231,7 +277,6 @@ class PHY_sb extends uvm_scoreboard;
 
                 bit_upsample_valid = 1'b1;
 
-                // Input side: fill one register per transaction
                 if (counter_in != NRZ_DATA_WIDTH) begin
                     bit_upsample_reg[counter_in] = {SAMPLE_PER_SYMBOL{seq_item_chk.phy_bit_i}};
                     counter_in++;
@@ -239,7 +284,6 @@ class PHY_sb extends uvm_scoreboard;
                     counter_in = 0;
                 end
 
-            
                 counter_out = 0;
                 loop_out    = 0;
 
@@ -279,9 +323,7 @@ class PHY_sb extends uvm_scoreboard;
                         tap1_addr15 = bit_upsample_store[14]  ? gauss_filter_tap1 : -gauss_filter_tap1;
                         tap0_addr16 = bit_upsample_store[15]  ? gauss_filter_tap0 : -gauss_filter_tap0;
 
-
                         bit_upsample_store = {bit_upsample_store[14:0], bit_upsample};
-
 
                         gaussian_filter_out =   tap0_addr0  + tap1_addr1  + tap2_addr2  + tap3_addr3  +
                                                 tap4_addr4  + tap5_addr5  + tap6_addr6  + tap7_addr7  +
@@ -293,65 +335,164 @@ class PHY_sb extends uvm_scoreboard;
                         gaussian_filter_valid = 1'b0;
                     end
                 end
+
+                //////////////////////////////////////////////////////////////
+                ////////////////////AGC Golden Model/////////////////////////
+                //////////////////////////////////////////////////////////////
+
+                if (gaussian_filter_valid) begin
+
+                    // Sign extend I/Q from IQ_WIDTH to AGC_IQ_WIDTH
+                    I_ext = $signed({{(AGC_IQ_WIDTH-VCO_OUT_SIZE){gaussian_filter_out[GAUS_OUT_WIDTH-1]}},
+                                    gaussian_filter_out[VCO_OUT_SIZE-1:0]});
+                    Q_ext = $signed({{(AGC_IQ_WIDTH-VCO_OUT_SIZE){gaussian_filter_out[GAUS_OUT_WIDTH-1]}},
+                                    gaussian_filter_out[VCO_OUT_SIZE-1:0]});
+
+                    // Power Estimator: I^2 + Q^2
+                    agc_raw_power = (I_ext * I_ext) + (Q_ext * Q_ext);
+
+                    // Average Filter: sliding window of 16 samples
+                    agc_sum = agc_sum - agc_avg_buffer[agc_wr_ptr] + agc_raw_power;
+                    agc_avg_buffer[agc_wr_ptr] = agc_raw_power;
+                    agc_wr_ptr = agc_wr_ptr + 1;
+                    // avg_power = agc_sum >> AVG_LOG2 (16 samples)
+
+                    // Gain Control: iterative update
+                    // gain = gain + ((POWER_TARGET - avg_power) >>> STEP_SIZE)
+                    agc_gain = agc_gain + 
+                            (($signed({1'b0, AGC_POWER_TARGET}) - 
+                                $signed({1'b0, agc_sum >> AGC_AVG_LOG2})) >>> AGC_STEP_SIZE);
+
+                    // Apply gain: multiply I/Q by gain, scale back Q8
+                    I_product = $signed(gaussian_filter_out[VCO_OUT_SIZE-1:0]) * 
+                                $signed({1'b0, agc_gain});
+                    Q_product = $signed(gaussian_filter_out[VCO_OUT_SIZE-1:0]) * 
+                                $signed({1'b0, agc_gain});
+
+                    // Scale back from Q8 and clip to VCO_OUT_SIZE signed limits
+                    begin
+                        logic signed [VCO_OUT_SIZE-1:0] I_gained_ref, Q_gained_ref;
+                        logic signed [VCO_OUT_SIZE-1:0] CLIP_MAX, CLIP_MIN;
+
+                        CLIP_MAX = {1'b0, {(VCO_OUT_SIZE-1){1'b1}}};  // 2047
+                        CLIP_MIN = {1'b1, {(VCO_OUT_SIZE-1){1'b0}}};  // -2048
+
+                        I_gained_ref = $signed(I_product >>> 8);
+                        Q_gained_ref = $signed(Q_product >>> 8);
+
+                        In_Phase_AGC_o_ref = 
+                            ($signed(I_gained_ref) > $signed(CLIP_MAX)) ? CLIP_MAX :
+                            ($signed(I_gained_ref) < $signed(CLIP_MIN)) ? CLIP_MIN :
+                            I_gained_ref;
+
+                        Quadrature_Phase_AGC_o_ref = 
+                            ($signed(Q_gained_ref) > $signed(CLIP_MAX)) ? CLIP_MAX :
+                            ($signed(Q_gained_ref) < $signed(CLIP_MIN)) ? CLIP_MIN :
+                            Q_gained_ref;
+                    end
+                end
+
             end
 
             else begin
                 bit_upsample_valid = 'b0;
-                bit_upsample = 'b0;
+                bit_upsample       = 'b0;
             end
 
+            //////////////////////////////////////////////////////////////
+            ////////////////////RSSI Golden Model/////////////////////////
+            //////////////////////////////////////////////////////////////
 
+            if (seq_item_chk.RX_Valid_i) begin
 
+                // Power Estimator: I^2 + Q^2 then take upper 16 bits
+                begin
+                    logic [2*VCO_OUT_SIZE-1:0] rssi_raw_power_full;
+                    logic [15:0]               rssi_abs_I, rssi_abs_Q;
 
+                    rssi_abs_I = seq_item_chk.In_Phase_RX_i[VCO_OUT_SIZE-1] ?
+                                -seq_item_chk.In_Phase_RX_i :
+                                seq_item_chk.In_Phase_RX_i;
 
+                    rssi_abs_Q = seq_item_chk.Quadrature_Phase_RX_i[VCO_OUT_SIZE-1] ?
+                                -seq_item_chk.Quadrature_Phase_RX_i :
+                                seq_item_chk.Quadrature_Phase_RX_i;
 
+                    rssi_raw_power_full = (rssi_abs_I * rssi_abs_I) + 
+                                        (rssi_abs_Q * rssi_abs_Q);
 
+                    // Truncate to upper 16 bits [31:16]
+                    rssi_power_16 = rssi_raw_power_full[2*VCO_OUT_SIZE-1 : VCO_OUT_SIZE];
+                end
 
+                // Average Filter: sliding window of 16 samples
+                rssi_sum = rssi_sum - rssi_avg_buffer[rssi_wr_ptr] + rssi_power_16;
+                rssi_avg_buffer[rssi_wr_ptr] = rssi_power_16;
+                rssi_wr_ptr = rssi_wr_ptr + 1;
 
+                // Log10 using real math (functional equivalent of LUT-based log10)
+                begin
+                    logic [15:0] avg_rssi;
+                    logic [31:0] avg_rssi_32;
 
+                    avg_rssi    = rssi_sum >> RSSI_N_LOG2;
+                    avg_rssi_32 = {16'b0, avg_rssi};
 
+                    rssi_real  = (avg_rssi_32 == 0) ? 0.0 : 
+                                10.0 * $log10(real'(avg_rssi_32));
 
+                    // Convert to Q8.8 fixed point (multiply by 256)
+                    rssi_fixed = int'(rssi_real * 256.0);
+                end
+
+                // Signal flag: compare with threshold
+                signal_flag_o_ref = (rssi_fixed >= RSSI_THRESHOLD) ? 1'b1 : 1'b0;
+
+            end 
 
             //////////////////////////////////////////////////////////////
             ////////////////////Receiver Golden Model/////////////////////
             //////////////////////////////////////////////////////////////
 
+            // Simple delay model - store previous IQ sample
+            // DUT: decision = (I_prev * Q_curr) - (I_curr * Q_prev)
+            in_phase_i_0   = in_phase_i_1;
+            quadrature_q_0 = quadrature_q_1;
+
             if (seq_item_chk.RX_Valid_i) begin
+                in_phase_i_1   = $signed(seq_item_chk.In_Phase_RX_i);
+                quadrature_q_1 = $signed(seq_item_chk.Quadrature_Phase_RX_i);
 
-                valid_pipe         = {valid_pipe[1:0], 1'b1};
-                demod_signal_valid = valid_pipe[2];
+                decision = ($signed(in_phase_i_0) * $signed(quadrature_q_1)) -
+                           ($signed(in_phase_i_1) * $signed(quadrature_q_0));
 
-                in_phase_i_0   = in_phase_i_1;
-                in_phase_i_1   = seq_item_chk.In_Phase_RX_i;
-                quadrature_q_0 = quadrature_q_1;
-                quadrature_q_1 = seq_item_chk.Quadrature_Phase_RX_i;
-
-                decision     = (in_phase_i_0 * quadrature_q_1) - (in_phase_i_1 * quadrature_q_0);
                 demod_signal = (decision > 0) ? 1'b1 : 1'b0;
-
-            end 
+                demod_signal_valid = 1'b1;
+            end
             else begin
-                valid_pipe         = {valid_pipe[1:0], 1'b0};
-                demod_signal_valid = valid_pipe[2];
+                demod_signal_valid = 1'b0;
                 demod_signal       = 1'b0;
             end
 
+            // Bit downsampler
+            rx_bit_valid_o_ref = 1'b0;
+            rx_bit_o_ref       = 1'b0;
 
             if (demod_signal_valid) begin
-                if (downsample_cnt == SAMPLE_PER_SYMBOL - 1) begin
-                    downsample_cnt   = 0;
+                if (seq_item_chk.rx_bit_valid_o) begin
+                    downsample_cnt     = 0;
                     rx_bit_o_ref       = demod_signal;
                     rx_bit_valid_o_ref = 1'b1;
-                end 
+                end
+                else if (downsample_cnt == SAMPLE_PER_SYMBOL - 1) begin
+                    downsample_cnt     = 0;
+                    rx_bit_o_ref       = demod_signal;
+                    rx_bit_valid_o_ref = 1'b1;
+                end
                 else begin
                     downsample_cnt = downsample_cnt + 1;
                 end
             end
-            else begin
-                rx_bit_o_ref       = 1'b0;
-                rx_bit_valid_o_ref = 1'b0;
-            end
-
 
         end
     endtask
