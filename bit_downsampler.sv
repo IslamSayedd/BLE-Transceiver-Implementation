@@ -1,4 +1,4 @@
-`timescale 1ns/1ps
+
 module bit_downsampler #(
     parameter SAMPLE_PER_SYMBOL = 8,
     parameter CNT_WIDTH = 4 

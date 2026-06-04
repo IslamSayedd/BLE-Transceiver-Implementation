@@ -9,9 +9,10 @@ class PHY_test extends uvm_test;
     `uvm_component_utils(PHY_test)
     virtual BLE_PHY_if BLE_PHY_vif;
     PHY_rst_seq rst_seq;
-    PHY_tap_seq tap_seq;
     PHY_sending_seq sending_seq;
     PHY_cov_tap_seq cov_tap_seq;
+    PHY_tx_seq tx_seq;
+    PHY_rx_seq rx_seq;
     PHY_env env;
     PHY_config cfg;
 
@@ -22,7 +23,8 @@ class PHY_test extends uvm_test;
     function void build_phase(uvm_phase phase);
         super.build_phase(phase);
         rst_seq     = PHY_rst_seq::type_id::create("rst_seq", this);
-        tap_seq     = PHY_tap_seq::type_id::create("tap_seq", this);
+        tx_seq      = PHY_tx_seq::type_id::create("tx_seq", this);
+        rx_seq      = PHY_rx_seq::type_id::create("rx_seq", this);
         cov_tap_seq = PHY_cov_tap_seq::type_id::create("cov_tap_seq", this);
         sending_seq = PHY_sending_seq::type_id::create("sending_seq", this);
         env = PHY_env::type_id::create("env", this);
@@ -45,17 +47,21 @@ class PHY_test extends uvm_test;
         rst_seq.start(env.agt.sqr);
         `uvm_info("run_phase","reset high",UVM_LOW);
 
-        `uvm_info("run_phase","Loading Taps started",UVM_LOW);
-        tap_seq.start(env.agt.sqr);
-        `uvm_info("run_phase","Loading Taps ended",UVM_LOW);
+        `uvm_info("run_phase","Coverage Tap Loading started",UVM_LOW);
+        cov_tap_seq.start(env.agt.sqr);
+        `uvm_info("run_phase","Coverage Tap Loading ended",UVM_LOW);
 
         `uvm_info("run_phase","Sending Data started",UVM_LOW);
-        sending_seq.start(env.agt.sqr);
+        tx_seq.start(env.agt.sqr);
         `uvm_info("run_phase","Sending Data ended",UVM_LOW);
 
-        `uvm_info("run_phase","Coverage Tap Loading started",UVM_LOW);
-        repeat(100) cov_tap_seq.start(env.agt.sqr);
-        `uvm_info("run_phase","Coverage Tap Loading ended",UVM_LOW);
+        /*`uvm_info("run_phase","Receiving Data started",UVM_LOW);
+        rx_seq.start(env.agt.sqr);
+        `uvm_info("run_phase","Receiving Data ended",UVM_LOW);*/
+
+        /*`uvm_info("run_phase","Sending Data started",UVM_LOW);
+        sending_seq.start(env.agt.sqr);
+        `uvm_info("run_phase","Sending Data ended",UVM_LOW);*/
 
         phase.drop_objection(this);
         

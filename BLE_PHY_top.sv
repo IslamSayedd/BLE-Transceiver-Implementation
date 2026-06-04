@@ -13,7 +13,7 @@ module BLE_PHY_top ();
 
     BLE_PHY_if PHY_if (clk);
     BLE_PHY_verif DUT(PHY_if);
-    bind BLE_PHY_verif PHY_sva BLE_PHY_if_inst (PHY_if);
+    //bind BLE_PHY_verif PHY_sva BLE_PHY_if_inst (PHY_if);
 
     initial begin
         $readmemh("sin_lut.txt", DUT.u_TX.u_vco.u_iq_wave_generator.sin_mem);

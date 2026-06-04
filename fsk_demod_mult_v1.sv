@@ -1,4 +1,4 @@
-`timescale 1ns/1ps
+
 module fsk_demod_mult_v1 #(parameter IQ_BIT_WIDTH = 8)  
 (
   input wire                           CLK_i,
