@@ -60,6 +60,27 @@ interface BLE_PHY_if(input bit clk);
     // RSSI Output
     logic                            signal_flag_o;
 
+    // Internal VCO outputs — for scoreboard cycle-accurate AGC model
+    logic [11:0]                     In_Phase_12_w;
+    logic [11:0]                     Quadrature_Phase_12_w;
+    logic                            Phase_Valid_w;
+
+    // AGC internal gain — for scoreboard cycle-accurate AGC model
+    logic [33:0]                     agc_gain_w;
+    logic                            agc_valid_w;
+
+    // AGC direct outputs — stable registered values
+    logic [11:0]                     agc_I_out_w;
+    logic [11:0]                     agc_Q_out_w;
+
+    // NRZ internal signals — for error analysis
+    logic                            nrz_valid_w;
+    logic                            upsample_valid_w;
+
+    // RX demodulator outputs — for scoreboard cycle-accurate RX checking
+    logic                            demod_signal_w;
+    logic                            demod_valid_w;
+
     ///////////////////////////////////////////////////////
     ///////////////Defining Modports///////////////////////
     ///////////////////////////////////////////////////////
@@ -68,7 +89,12 @@ interface BLE_PHY_if(input bit clk);
                Quadrature_Phase_RX_i, In_Phase_RX_i, RX_Valid_i,
         output Quadrature_Phase_AGC_o, In_Phase_AGC_o,
                rx_bit_o, rx_bit_valid_o,
-               signal_flag_o
+               signal_flag_o,
+               In_Phase_12_w, Quadrature_Phase_12_w, Phase_Valid_w,
+               agc_gain_w, agc_valid_w,
+               agc_I_out_w, agc_Q_out_w,
+               nrz_valid_w, upsample_valid_w,
+               demod_signal_w, demod_valid_w
     );
 
 

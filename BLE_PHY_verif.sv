@@ -75,11 +75,11 @@ module BLE_PHY_verif (BLE_PHY_if.DUT PHY_if);
     //==========================================================================
     // Interface Assignments — Outputs
     //==========================================================================
-    assign PHY_if.In_Phase_AGC_o        = In_Phase_AGC_o;
-    assign PHY_if.Quadrature_Phase_AGC_o = Quadrature_Phase_AGC_o;
-    assign PHY_if.rx_bit_o              = rx_bit_o;
-    assign PHY_if.rx_bit_valid_o        = rx_bit_valid_o;
-    assign PHY_if.signal_flag_o         = signal_flag_o;
+    assign PHY_if.In_Phase_AGC_o            = In_Phase_AGC_o;
+    assign PHY_if.Quadrature_Phase_AGC_o    = Quadrature_Phase_AGC_o;
+    assign PHY_if.rx_bit_o                  = rx_bit_o;
+    assign PHY_if.rx_bit_valid_o            = rx_bit_valid_o;
+    assign PHY_if.signal_flag_o             = signal_flag_o;
 
     //==========================================================================
     // Internal wires — TX outputs (16-bit VCO output)
@@ -96,6 +96,19 @@ module BLE_PHY_verif (BLE_PHY_if.DUT PHY_if);
 
     assign In_Phase_12_w         = In_Phase_w[IQ_WIDTH-1:0];
     assign Quadrature_Phase_12_w = Quadrature_Phase_w[IQ_WIDTH-1:0];
+
+    // Expose internal signals through interface for scoreboard
+    assign PHY_if.In_Phase_12_w         = In_Phase_12_w;
+    assign PHY_if.Quadrature_Phase_12_w = Quadrature_Phase_12_w;
+    assign PHY_if.Phase_Valid_w         = Phase_Valid_w;
+    assign PHY_if.agc_gain_w            = u_AGC.gain_o;
+    assign PHY_if.agc_valid_w           = u_AGC.valid_out_o;
+    assign PHY_if.agc_I_out_w           = u_AGC.I_out_o;
+    assign PHY_if.agc_Q_out_w           = u_AGC.Q_out_o;
+    assign PHY_if.nrz_valid_w           = u_TX.u_nrz_upsample.DUT1.NRZ_valid_o;
+    assign PHY_if.upsample_valid_w      = u_TX.u_nrz_upsample.DUT2.bit_upsample_valid_o;
+    assign PHY_if.demod_signal_w        = u_RX.u_fsk_demod.demod_signal_o;
+    assign PHY_if.demod_valid_w         = u_RX.u_fsk_demod.demod_signal_valid_o;
 
     //==========================================================================
     // Internal wires — AGC

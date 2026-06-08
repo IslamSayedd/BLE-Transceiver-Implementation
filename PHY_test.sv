@@ -55,13 +55,13 @@ class PHY_test extends uvm_test;
         tx_seq.start(env.agt.sqr);
         `uvm_info("run_phase","Sending Data ended",UVM_LOW);
 
-        /*`uvm_info("run_phase","Receiving Data started",UVM_LOW);
+        `uvm_info("run_phase","Receiving Data started",UVM_LOW);
         rx_seq.start(env.agt.sqr);
-        `uvm_info("run_phase","Receiving Data ended",UVM_LOW);*/
+        `uvm_info("run_phase","Receiving Data ended",UVM_LOW);
 
-        /*`uvm_info("run_phase","Sending Data started",UVM_LOW);
+        `uvm_info("run_phase","Sending Data started",UVM_LOW);
         sending_seq.start(env.agt.sqr);
-        `uvm_info("run_phase","Sending Data ended",UVM_LOW);*/
+        `uvm_info("run_phase","Sending Data ended",UVM_LOW);
 
         phase.drop_objection(this);
         

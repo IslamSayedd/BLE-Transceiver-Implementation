@@ -28,4 +28,5 @@ PHY_sb.sv
 PHY_coverage.sv
 PHY_env.sv
 PHY_test.sv
+PHY_sva.sv
 BLE_PHY_top.sv

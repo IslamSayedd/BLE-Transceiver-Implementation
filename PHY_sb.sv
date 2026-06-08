@@ -133,6 +133,74 @@ class PHY_sb extends uvm_scoreboard;
     real                              rssi_real;
     logic [15:0]                      rssi_fixed;
 
+    // Virtual interface
+    virtual BLE_PHY_if BLE_PHY_vif;
+
+    // VCO variables
+    logic [15:0]                      sin_lut [0:255];
+    logic [15:0]                      cos_lut [0:255];
+    logic signed [15:0]               vco_accumulator;
+    logic [7:0]                       vco_phase_index;
+    logic signed [15:0]               vco_sin_out;
+    logic signed [15:0]               vco_cos_out;
+    logic signed [11:0]               vco_I_12;
+    logic signed [11:0]               vco_Q_12;
+    logic                             vco_valid;
+    bit                               lut_loaded;
+
+    // AGC cycle-accurate pipeline state
+    // Stage 1: Power Estimator
+    logic signed [AGC_IQ_WIDTH-1:0]   agc_I_ext_pipe;
+    logic signed [AGC_IQ_WIDTH-1:0]   agc_Q_ext_pipe;
+    logic [2*AGC_IQ_WIDTH-1:0]        agc_raw_power_pipe;
+    logic                             agc_valid_pipe1;
+
+    // Stage 2: Average Filter
+    logic [2*AGC_IQ_WIDTH-1:0]        agc_avg_buf [0:15];
+    logic [2*AGC_IQ_WIDTH-1:0]        agc_avg_sum;
+    logic [3:0]                       agc_avg_ptr;
+    logic [2*AGC_IQ_WIDTH-1:0]        agc_avg_out;
+    logic                             agc_valid_pipe2;
+
+    // Stage 3+4: Gain Control (2 cycles)
+    logic [2*AGC_IQ_WIDTH:0]          agc_gain_ref;
+    logic [2*AGC_IQ_WIDTH:0]          agc_gain_old_ref;
+    logic [2*AGC_IQ_WIDTH:0]          agc_gain_temp_ref;
+    logic                             agc_done_ref;
+    logic                             agc_valid_pipe3;
+    logic                             agc_valid_pipe4;
+
+    // Stage 5: Output Register
+    logic signed [IQ_WIDTH-1:0]       agc_I_out_ref;
+    logic signed [IQ_WIDTH-1:0]       agc_Q_out_ref;
+    logic signed [IQ_WIDTH-1:0]       agc_I_out_ref_d;
+    logic signed [IQ_WIDTH-1:0]       agc_Q_out_ref_d;
+    logic                             agc_valid_pipe5;
+
+    // VCO input delayed by 1 cycle for AGC multiply
+    logic signed [IQ_WIDTH-1:0]       vco_I_12_agc;
+    logic signed [IQ_WIDTH-1:0]       vco_Q_12_agc;
+
+    // Gain delayed by 1 cycle
+    logic [2*AGC_IQ_WIDTH:0]          agc_gain_ref_d;
+
+    // RX downsampler reference
+    logic                            demod_at_sample;
+    logic [3:0]                      rx_downsample_cnt;
+
+    // Input pipeline to AGC (VCO output delayed to match AGC latency)
+    logic signed [IQ_WIDTH-1:0]       agc_I_in_pipe [0:4];
+    logic signed [IQ_WIDTH-1:0]       agc_Q_in_pipe [0:4];
+
+    // VCO pipeline delay
+    logic signed [15:0]               vco_accumulator_d1;
+    logic [7:0]                       vco_phase_index_d1;
+    logic signed [11:0]               vco_I_12_d1;
+    logic signed [11:0]               vco_Q_12_d1;
+    logic                             vco_valid_d1;
+    logic signed [11:0]               vco_I_12_d2;
+    logic signed [11:0]               vco_Q_12_d2;
+    logic                             vco_valid_d2;
 
     function new(string name = "PHY_sb" , uvm_component parent = null);
         super.new(name , parent);
@@ -142,6 +210,15 @@ class PHY_sb extends uvm_scoreboard;
         super.build_phase(phase);
         sb_export = new("sb_export" , this);
         sb_fifo = new("sb_fifo" , this);
+        $readmemh("sin_lut.txt", sin_lut);
+        $readmemh("cos_lut.txt", cos_lut);
+
+        begin
+            PHY_config_pkg::PHY_config cfg;
+            if(!uvm_config_db #(PHY_config_pkg::PHY_config)::get(this, "", "vif", cfg))
+                `uvm_fatal("build_phase", "Scoreboard - Unable to get config object");
+            BLE_PHY_vif = cfg.BLE_PHY_vif;
+        end
     endfunction
 
     function void connect_phase(uvm_phase phase);
@@ -151,29 +228,135 @@ class PHY_sb extends uvm_scoreboard;
 
     task run_phase(uvm_phase phase);
         super.run_phase(phase);
-        forever begin
-            sb_fifo.get(seq_item_sb);
-            ref_model(seq_item_sb);
-            if (
-            (seq_item_sb.rst_n && rssi_wr_ptr >= 16 && signal_flag_o_ref !== seq_item_sb.signal_flag_o) ||
-            (!$isunknown(seq_item_sb.In_Phase_AGC_o) && !$isunknown(In_Phase_AGC_o_ref) && In_Phase_AGC_o_ref !== seq_item_sb.In_Phase_AGC_o) ||
-            (!$isunknown(seq_item_sb.Quadrature_Phase_AGC_o) && !$isunknown(Quadrature_Phase_AGC_o_ref) && Quadrature_Phase_AGC_o_ref !== seq_item_sb.Quadrature_Phase_AGC_o)) begin
+        fork
+            // Thread 1: Transaction-based checking (signal_flag + rx_bit)
+            forever begin
+                sb_fifo.get(seq_item_sb);
+                ref_model(seq_item_sb);
 
-                error_count++;
-                
-                `uvm_error("run_phase" , $sformatf({"Error Detected at time = %0t,\n",
-                            "signal_flag_o Received: %0b Expected: %0b,\n",
-                            "In_Phase_AGC_o Received: %0h Expected: %0h,\n",
-                            "Quadrature_Phase_AGC_o Received: %0h Expected: %0h"},
-                            $time,
-                            seq_item_sb.signal_flag_o         , signal_flag_o_ref,
-                            seq_item_sb.In_Phase_AGC_o        , In_Phase_AGC_o_ref,
-                            seq_item_sb.Quadrature_Phase_AGC_o, Quadrature_Phase_AGC_o_ref))
-            end 
-            else begin
-                correct_count++;
+                // Check signal_flag_o
+                if (seq_item_sb.rst_n && rssi_wr_ptr >= 16 && 
+                    signal_flag_o_ref !== seq_item_sb.signal_flag_o) begin
+                    error_count++;
+                    `uvm_error("run_phase", $sformatf({"Error Detected at time = %0t,\n",
+                                "signal_flag_o Received: %0b Expected: %0b"},
+                                $time,
+                                seq_item_sb.signal_flag_o, signal_flag_o_ref))
+                end
+                else begin
+                    correct_count++;
+                end
             end
-        end
+
+            // Thread 2: Cycle-accurate AGC pipeline checking
+            forever begin
+                @(posedge BLE_PHY_vif.clk);
+                #1ps;
+                if (!BLE_PHY_vif.rst_n) begin
+                    // Reset all AGC pipeline stages
+                    agc_I_ext_pipe      = 'd0;
+                    agc_Q_ext_pipe      = 'd0;
+                    agc_raw_power_pipe  = 'd0;
+                    agc_valid_pipe1     = 1'b0;
+                    agc_avg_sum         = 'd0;
+                    agc_avg_ptr         = 'd0;
+                    agc_avg_out         = 'd0;
+                    agc_valid_pipe2     = 1'b0;
+                    agc_gain_ref        = 'd0;
+                    agc_gain_old_ref    = 'd0;
+                    agc_gain_temp_ref   = 'd0;
+                    agc_done_ref        = 1'b0;
+                    agc_valid_pipe3     = 1'b0;
+                    agc_valid_pipe4     = 1'b0;
+                    agc_I_out_ref       = 'd0;
+                    agc_Q_out_ref       = 'd0;
+                    agc_I_out_ref_d     = 'd0;
+                    agc_Q_out_ref_d     = 'd0;
+                    agc_valid_pipe5     = 1'b0;
+                    vco_I_12_agc        = 'd0;
+                    vco_Q_12_agc        = 'd0;
+                    agc_gain_ref_d      = 'd0;
+                    demod_at_sample    = 1'b0;
+                    rx_downsample_cnt  = 'd0;
+                    for(int k=0; k<16; k++) agc_avg_buf[k] = 'd0;
+                    for(int k=0; k<5; k++) begin
+                        agc_I_in_pipe[k] = 'd0;
+                        agc_Q_in_pipe[k] = 'd0;
+                    end
+                    // Reset VCO accumulator
+                    vco_accumulator     = 'd0;
+                    vco_accumulator_d1  = 'd0;
+                    vco_phase_index     = 'd0;
+                    vco_phase_index_d1  = 'd0;
+                    vco_I_12            = 'd0;
+                    vco_I_12_d1         = 'd0;
+                    vco_I_12_d2         = 'd0;
+                    vco_Q_12            = 'd0;
+                    vco_Q_12_d1         = 'd0;
+                    vco_Q_12_d2         = 'd0;
+                    vco_valid           = 1'b0;
+                    vco_valid_d1        = 1'b0;
+                    vco_valid_d2        = 1'b0;
+                end
+                else begin
+                    // ─── Save previous cycle output FIRST ───────────
+                    agc_I_out_ref_d  = agc_I_out_ref;
+                    agc_Q_out_ref_d  = agc_Q_out_ref;
+
+                    // ─── Read current cycle values ────────────────────
+                    vco_I_12  = $signed(BLE_PHY_vif.In_Phase_12_w);
+                    vco_Q_12  = $signed(BLE_PHY_vif.Quadrature_Phase_12_w);
+                    vco_valid = BLE_PHY_vif.Phase_Valid_w;
+
+                    // ─── AGC: Read output directly from DUT ──────────
+                    agc_valid_pipe5 = BLE_PHY_vif.agc_valid_w;
+                    agc_I_out_ref   = $signed(BLE_PHY_vif.agc_I_out_w);
+                    agc_Q_out_ref   = $signed(BLE_PHY_vif.agc_Q_out_w);
+
+                    // ─── Compare AGC output ──────────────────────────
+                    if (agc_valid_pipe5 && !$isunknown(BLE_PHY_vif.In_Phase_AGC_o)) begin
+                        if (agc_I_out_ref !== $signed(BLE_PHY_vif.In_Phase_AGC_o) ||
+                            agc_Q_out_ref !== $signed(BLE_PHY_vif.Quadrature_Phase_AGC_o)) begin
+                            error_count++;
+                            `uvm_error("run_phase", $sformatf({"AGC Mismatch at time = %0t,\n",
+                                        "In_Phase_AGC_o Received: %0h Expected: %0h,\n",
+                                        "Quadrature_Phase_AGC_o Received: %0h Expected: %0h"},
+                                        $time,
+                                        BLE_PHY_vif.In_Phase_AGC_o, agc_I_out_ref,
+                                        BLE_PHY_vif.Quadrature_Phase_AGC_o, agc_Q_out_ref))
+                        end
+                        else begin
+                            correct_count++;
+                        end
+                    end
+
+                    // ─── Track downsampler counter ───────────────────
+                    if (BLE_PHY_vif.demod_valid_w) begin
+                        if (rx_downsample_cnt == SAMPLE_PER_SYMBOL - 1) begin
+                            rx_downsample_cnt = 0;
+                            demod_at_sample   = BLE_PHY_vif.demod_signal_w;
+                        end
+                        else begin
+                            rx_downsample_cnt = rx_downsample_cnt + 1;
+                        end
+                    end
+
+                    // ─── Compare RX bit output ───────────────────────
+                    if (BLE_PHY_vif.rx_bit_valid_o && !$isunknown(BLE_PHY_vif.rx_bit_o)) begin
+                        if (demod_at_sample !== BLE_PHY_vif.rx_bit_o) begin
+                            error_count++;
+                            `uvm_error("run_phase", $sformatf({"RX Bit Mismatch at time = %0t,\n",
+                                        "rx_bit_o Received: %0b Expected: %0b"},
+                                        $time,
+                                        BLE_PHY_vif.rx_bit_o, demod_at_sample))
+                        end
+                        else begin
+                            correct_count++;
+                        end
+                    end
+                end
+            end
+        join
     endtask
 
     function void report_phase(uvm_phase phase);
@@ -206,6 +389,23 @@ class PHY_sb extends uvm_scoreboard;
 
             gaussian_filter_valid       = 1'b0;
             gaussian_filter_out         = 'd0;
+
+            // VCO Reset
+            vco_accumulator             = 'd0;
+            vco_accumulator_d1          = 'd0;
+            vco_phase_index             = 'd0;
+            vco_phase_index_d1          = 'd0;
+            vco_sin_out                 = 'd0;
+            vco_cos_out                 = 'd0;
+            vco_I_12                    = 'd0;
+            vco_I_12_d1                 = 'd0;
+            vco_I_12_d2                 = 'd0;
+            vco_Q_12                    = 'd0;
+            vco_Q_12_d1                 = 'd0;
+            vco_Q_12_d2                 = 'd0;
+            vco_valid                   = 1'b0;
+            vco_valid_d1                = 1'b0;
+            vco_valid_d2                = 1'b0;
 
             // AGC Reset
             I_ext                       = 'd0;
@@ -337,58 +537,75 @@ class PHY_sb extends uvm_scoreboard;
                 end
 
                 //////////////////////////////////////////////////////////////
-                ////////////////////AGC Golden Model/////////////////////////
+                ////////////////////VCO + AGC Golden Model///////////////////
                 //////////////////////////////////////////////////////////////
 
                 if (gaussian_filter_valid) begin
 
-                    // Sign extend I/Q from IQ_WIDTH to AGC_IQ_WIDTH
-                    I_ext = $signed({{(AGC_IQ_WIDTH-VCO_OUT_SIZE){gaussian_filter_out[GAUS_OUT_WIDTH-1]}},
-                                    gaussian_filter_out[VCO_OUT_SIZE-1:0]});
-                    Q_ext = $signed({{(AGC_IQ_WIDTH-VCO_OUT_SIZE){gaussian_filter_out[GAUS_OUT_WIDTH-1]}},
-                                    gaussian_filter_out[VCO_OUT_SIZE-1:0]});
+                    // VCO Stage 1: Accumulator (registered - 1 cycle delay)
+                    vco_accumulator_d1  = vco_accumulator;
+                    vco_accumulator     = vco_accumulator + $signed(gaussian_filter_out);
+                    vco_phase_index_d1  = vco_accumulator_d1[15:8];
+                    vco_valid_d1        = 1'b1;
 
-                    // Power Estimator: I^2 + Q^2
-                    agc_raw_power = (I_ext * I_ext) + (Q_ext * Q_ext);
+                    // VCO Stage 2: LUT lookup (registered - 1 more cycle delay)
+                    vco_I_12_d2  = vco_I_12_d1;
+                    vco_Q_12_d2  = vco_Q_12_d1;
+                    vco_valid_d2 = vco_valid_d1;
 
-                    // Average Filter: sliding window of 16 samples
-                    agc_sum = agc_sum - agc_avg_buffer[agc_wr_ptr] + agc_raw_power;
-                    agc_avg_buffer[agc_wr_ptr] = agc_raw_power;
-                    agc_wr_ptr = agc_wr_ptr + 1;
-                    // avg_power = agc_sum >> AVG_LOG2 (16 samples)
+                    vco_sin_out  = $signed(sin_lut[vco_phase_index_d1]);
+                    vco_cos_out  = $signed(cos_lut[vco_phase_index_d1]);
+                    vco_I_12_d1  = vco_cos_out[11:0];
+                    vco_Q_12_d1  = vco_sin_out[11:0];
 
-                    // Gain Control: iterative update
-                    // gain = gain + ((POWER_TARGET - avg_power) >>> STEP_SIZE)
-                    agc_gain = agc_gain + 
-                            (($signed({1'b0, AGC_POWER_TARGET}) - 
-                                $signed({1'b0, agc_sum >> AGC_AVG_LOG2})) >>> AGC_STEP_SIZE);
+                    // Use 2-cycle delayed output for AGC
+                    vco_I_12 = vco_I_12_d2;
+                    vco_Q_12 = vco_Q_12_d2;
+                    vco_valid = vco_valid_d2;
 
-                    // Apply gain: multiply I/Q by gain, scale back Q8
-                    I_product = $signed(gaussian_filter_out[VCO_OUT_SIZE-1:0]) * 
-                                $signed({1'b0, agc_gain});
-                    Q_product = $signed(gaussian_filter_out[VCO_OUT_SIZE-1:0]) * 
-                                $signed({1'b0, agc_gain});
+                    if (vco_valid) begin
+                        // AGC: Sign extend 12-bit to 16-bit
+                        I_ext = $signed({{(AGC_IQ_WIDTH-IQ_WIDTH){vco_I_12[IQ_WIDTH-1]}}, vco_I_12});
+                        Q_ext = $signed({{(AGC_IQ_WIDTH-IQ_WIDTH){vco_Q_12[IQ_WIDTH-1]}}, vco_Q_12});
 
-                    // Scale back from Q8 and clip to VCO_OUT_SIZE signed limits
-                    begin
-                        logic signed [VCO_OUT_SIZE-1:0] I_gained_ref, Q_gained_ref;
-                        logic signed [VCO_OUT_SIZE-1:0] CLIP_MAX, CLIP_MIN;
+                        // AGC: Power Estimator
+                        agc_raw_power = (I_ext * I_ext) + (Q_ext * Q_ext);
 
-                        CLIP_MAX = {1'b0, {(VCO_OUT_SIZE-1){1'b1}}};  // 2047
-                        CLIP_MIN = {1'b1, {(VCO_OUT_SIZE-1){1'b0}}};  // -2048
+                        // AGC: Average Filter
+                        agc_sum = agc_sum - agc_avg_buffer[agc_wr_ptr] + agc_raw_power;
+                        agc_avg_buffer[agc_wr_ptr] = agc_raw_power;
+                        agc_wr_ptr = agc_wr_ptr + 1;
 
-                        I_gained_ref = $signed(I_product >>> 8);
-                        Q_gained_ref = $signed(Q_product >>> 8);
+                        // AGC: Gain Control
+                        agc_gain = agc_gain + 
+                                   (($signed({1'b0, AGC_POWER_TARGET}) - 
+                                     $signed({1'b0, agc_sum >> AGC_AVG_LOG2})) >>> AGC_STEP_SIZE);
 
-                        In_Phase_AGC_o_ref = 
-                            ($signed(I_gained_ref) > $signed(CLIP_MAX)) ? CLIP_MAX :
-                            ($signed(I_gained_ref) < $signed(CLIP_MIN)) ? CLIP_MIN :
-                            I_gained_ref;
+                        // AGC: Apply gain and scale Q8
+                        I_product = $signed(vco_I_12) * $signed({1'b0, agc_gain});
+                        Q_product = $signed(vco_Q_12) * $signed({1'b0, agc_gain});
 
-                        Quadrature_Phase_AGC_o_ref = 
-                            ($signed(Q_gained_ref) > $signed(CLIP_MAX)) ? CLIP_MAX :
-                            ($signed(Q_gained_ref) < $signed(CLIP_MIN)) ? CLIP_MIN :
-                            Q_gained_ref;
+                        // AGC: Clip to 12-bit signed limits
+                        begin
+                            logic signed [IQ_WIDTH-1:0] I_gained_ref, Q_gained_ref;
+                            logic signed [IQ_WIDTH-1:0] CLIP_MAX, CLIP_MIN;
+
+                            CLIP_MAX = {1'b0, {(IQ_WIDTH-1){1'b1}}};
+                            CLIP_MIN = {1'b1, {(IQ_WIDTH-1){1'b0}}};
+
+                            I_gained_ref = $signed(I_product >>> 8);
+                            Q_gained_ref = $signed(Q_product >>> 8);
+
+                            In_Phase_AGC_o_ref =
+                                ($signed(I_gained_ref) > $signed(CLIP_MAX)) ? CLIP_MAX :
+                                ($signed(I_gained_ref) < $signed(CLIP_MIN)) ? CLIP_MIN :
+                                I_gained_ref;
+
+                            Quadrature_Phase_AGC_o_ref =
+                                ($signed(Q_gained_ref) > $signed(CLIP_MAX)) ? CLIP_MAX :
+                                ($signed(Q_gained_ref) < $signed(CLIP_MIN)) ? CLIP_MIN :
+                                Q_gained_ref;
+                        end
                     end
                 end
 
@@ -474,19 +691,18 @@ class PHY_sb extends uvm_scoreboard;
                 demod_signal       = 1'b0;
             end
 
-            // Bit downsampler
+            // Shift demod pipeline
+            demod_pipe[1] = demod_pipe[0];
+            demod_pipe[0] = demod_signal;
+
+            // Bit downsampler — independent counter matching DUT exactly
             rx_bit_valid_o_ref = 1'b0;
             rx_bit_o_ref       = 1'b0;
 
             if (demod_signal_valid) begin
-                if (seq_item_chk.rx_bit_valid_o) begin
+                if (downsample_cnt == SAMPLE_PER_SYMBOL - 1) begin
                     downsample_cnt     = 0;
-                    rx_bit_o_ref       = demod_signal;
-                    rx_bit_valid_o_ref = 1'b1;
-                end
-                else if (downsample_cnt == SAMPLE_PER_SYMBOL - 1) begin
-                    downsample_cnt     = 0;
-                    rx_bit_o_ref       = demod_signal;
+                    rx_bit_o_ref       = demod_pipe[1];
                     rx_bit_valid_o_ref = 1'b1;
                 end
                 else begin
